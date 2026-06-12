@@ -1,0 +1,4 @@
+Flask
+python-frontmatter
+Markdown
+python-markdown-math
