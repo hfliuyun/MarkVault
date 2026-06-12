@@ -40,15 +40,22 @@ class ContentIndex:
         self.series_by_id: dict[str, dict[str, Any]] = {}
         self.categories: dict[str, list[Post]] = {}
         self.tags: dict[str, list[Post]] = {}
+        self.content_signature: tuple[tuple[str, int, int], ...] = ()
         self.reload()
 
     def reload(self) -> None:
+        content_signature = self._build_content_signature()
         posts = self._load_posts()
         self.posts_by_slug = {post.slug: post for post in posts}
         self.posts = sorted(posts, key=lambda post: post.date, reverse=True)
         self.series_by_id = self._build_series_index(posts)
         self.categories = self._build_taxonomy_index(posts, "categories")
         self.tags = self._build_taxonomy_index(posts, "tags")
+        self.content_signature = content_signature
+
+    def reload_if_changed(self) -> None:
+        if self._build_content_signature() != self.content_signature:
+            self.reload()
 
     def list_posts(self, page: int = 1, size: int = 10) -> dict[str, Any]:
         page = max(page, 1)
@@ -134,6 +141,22 @@ class ContentIndex:
             seen_slugs[post.slug] = index_path
             posts.append(post)
         return posts
+
+    def _build_content_signature(self) -> tuple[tuple[str, int, int], ...]:
+        if not self.posts_root.exists():
+            return ()
+
+        signature = []
+        for index_path in sorted(self.posts_root.glob("*/index.md")):
+            stat = index_path.stat()
+            signature.append(
+                (
+                    index_path.relative_to(self.posts_root).as_posix(),
+                    stat.st_mtime_ns,
+                    stat.st_size,
+                )
+            )
+        return tuple(signature)
 
     def _load_post(self, index_path: Path) -> Post:
         parsed = frontmatter.load(index_path)

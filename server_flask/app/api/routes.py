@@ -20,6 +20,8 @@ def get_content_index():
     content_root = current_app.config["CONTENT_ROOT"]
     if _content_index is None or _content_index.content_root != content_root:
         _content_index = ContentIndex(content_root)
+    else:
+        _content_index.reload_if_changed()
     return _content_index
 
 
