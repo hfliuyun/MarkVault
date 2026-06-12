@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import renderMathInElement from 'katex/dist/contrib/auto-render';
 import hljs from 'highlight.js';
 import { getLegacyPost, getPost } from '@/api/posts';
@@ -9,22 +9,46 @@ import 'highlight.js/styles/atom-one-dark.css';
 import 'katex/dist/katex.min.css';
 
 const route = useRoute();
+const router = useRouter();
 const article = ref(null);
 const loading = ref(true);
 const sidebarCollapsed = ref(false);
 const markdownContainer = ref(null);
+const activeHeadingId = ref('');
 
 const formatDate = (dateText) => {
   if (!dateText) return '';
   return new Date(dateText).toLocaleDateString();
 };
 
-const scrollToHeading = (headingId) => {
+const decodeRouteHash = (hash) => {
+  if (!hash) return '';
+  try {
+    return decodeURIComponent(hash.slice(1));
+  } catch (error) {
+    return hash.slice(1);
+  }
+};
+
+const scrollToHeading = (headingId, behavior = 'smooth') => {
   const heading = document.getElementById(headingId);
   if (!heading) {
     return;
   }
-  heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  activeHeadingId.value = headingId;
+  const top = heading.getBoundingClientRect().top + window.scrollY - 84;
+  window.scrollTo({ top: Math.max(top, 0), behavior });
+};
+
+const handleTocClick = async (headingId) => {
+  await router.replace({
+    name: route.name,
+    params: route.params,
+    query: route.query,
+    hash: `#${headingId}`,
+  });
+  await nextTick();
+  scrollToHeading(headingId);
 };
 
 const enhanceMarkdownContent = () => {
@@ -111,11 +135,24 @@ const fetchArticle = async () => {
   if (article.value) {
     await nextTick();
     enhanceMarkdownContent();
+    const headingId = decodeRouteHash(route.hash);
+    if (headingId) {
+      scrollToHeading(headingId, 'auto');
+    }
   }
 };
 
 onMounted(fetchArticle);
-watch(() => route.fullPath, fetchArticle);
+watch(() => [route.params.slug, route.params.abbrlink], fetchArticle);
+
+watch(() => route.hash, async (hash) => {
+  const headingId = decodeRouteHash(hash);
+  if (!headingId || loading.value) {
+    return;
+  }
+  await nextTick();
+  scrollToHeading(headingId);
+});
 </script>
 
 <template>
@@ -155,8 +192,8 @@ watch(() => route.fullPath, fetchArticle);
                 v-for="item in article.toc"
                 :key="item.id"
                 type="button"
-                :class="`level-${item.level}`"
-                @click="scrollToHeading(item.id)"
+                :class="[`level-${item.level}`, { active: activeHeadingId === item.id }]"
+                @click="handleTocClick(item.id)"
               >
                 {{ item.title }}
               </button>
@@ -289,6 +326,11 @@ watch(() => route.fullPath, fetchArticle);
   line-height: 1.45;
   text-align: left;
   cursor: pointer;
+}
+
+.toc-list button.active,
+.toc-list button:hover {
+  color: var(--blog-accent);
 }
 
 .toc-list .level-3 {
