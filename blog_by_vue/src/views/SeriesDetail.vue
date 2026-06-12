@@ -1,8 +1,8 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import axios from 'axios';
 import { Calendar, CollectionTag } from '@element-plus/icons-vue';
+import { getSeries } from '@/api/series';
 
 const route = useRoute();
 const series = ref(null);
@@ -12,8 +12,7 @@ const fetchSeries = async () => {
   loading.value = true;
   series.value = null;
   try {
-    const response = await axios.get(`/api/series/${route.params.seriesId}`);
-    series.value = response.data;
+    series.value = await getSeries(route.params.seriesId);
   } catch (error) {
     console.error('获取系列详情失败:', error);
   } finally {
@@ -27,11 +26,11 @@ watch(() => route.params.seriesId, fetchSeries);
 
 <template>
   <main class="series-detail-page">
-    <div v-if="loading">
+    <div v-if="loading" class="loading-list">
       <el-skeleton :rows="1" animated class="title-skeleton" />
-      <el-card v-for="i in 4" :key="i" class="post-card" shadow="hover">
+      <article v-for="i in 4" :key="i" class="post-card">
         <el-skeleton :rows="3" animated />
-      </el-card>
+      </article>
     </div>
 
     <el-result
@@ -52,7 +51,7 @@ watch(() => route.params.seriesId, fetchSeries);
         <p>{{ series.count }} 篇文章 · 更新于 {{ new Date(series.updated_at).toLocaleDateString() }}</p>
       </header>
 
-      <el-card v-for="post in series.posts" :key="post.slug" class="post-card" shadow="hover">
+      <article v-for="post in series.posts" :key="post.slug" class="post-card">
         <h2>
           <router-link :to="{ name: 'PostDetail', params: { slug: post.slug } }">
             {{ post.title }}
@@ -69,7 +68,7 @@ watch(() => route.params.seriesId, fetchSeries);
           </span>
         </div>
         <p class="summary">{{ post.summary }}</p>
-      </el-card>
+      </article>
     </template>
   </main>
 </template>
@@ -78,32 +77,37 @@ watch(() => route.params.seriesId, fetchSeries);
 .series-detail-page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 28px 5%;
+  padding: 36px 24px 56px;
   text-align: left;
 }
 
 .series-detail-header {
-  margin-bottom: 20px;
+  margin-bottom: 4px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--blog-border);
 }
 
 .back-link {
-  color: #409eff;
+  color: var(--blog-accent);
   font-size: 14px;
   text-decoration: none;
 }
 
 .series-detail-header h1 {
   margin: 10px 0 8px;
-  color: #303133;
+  color: var(--blog-text);
+  font-size: 30px;
+  line-height: 1.25;
 }
 
 .series-detail-header p {
   margin: 0;
-  color: #909399;
+  color: var(--blog-muted);
 }
 
 .post-card {
-  margin-bottom: 18px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--blog-border);
 }
 
 .post-card h2 {
@@ -112,19 +116,19 @@ watch(() => route.params.seriesId, fetchSeries);
 }
 
 .post-card h2 a {
-  color: #303133;
+  color: var(--blog-text);
   text-decoration: none;
 }
 
 .post-card h2 a:hover {
-  color: #409eff;
+  color: var(--blog-accent);
 }
 
 .post-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  color: #909399;
+  color: var(--blog-muted);
   font-size: 14px;
 }
 
@@ -135,7 +139,18 @@ watch(() => route.params.seriesId, fetchSeries);
 }
 
 .summary {
-  color: #606266;
+  margin: 12px 0 0;
+  color: var(--blog-subtle);
   line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .series-detail-page {
+    padding: 26px 18px 42px;
+  }
+
+  .post-card h2 {
+    font-size: 20px;
+  }
 }
 </style>

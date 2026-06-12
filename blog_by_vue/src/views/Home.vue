@@ -1,68 +1,34 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-// 引入 Element Plus 图标
 import { Calendar, CollectionTag } from '@element-plus/icons-vue';
-import axios from 'axios';
-
-// --- 响应式数据定义 ---
+import { listPosts } from '@/api/posts';
 
 const articleList = ref([]);
 const loading = ref(true);
 const currentPage = ref(1);
-const pageSize = ref(10); // 卡片式布局，每页10篇可能更合适
+const pageSize = ref(10);
 const total = ref(0);
 
-// --- 数据获取逻辑 ---
-
-/**
- * @description 获取文章列表数据
- * @param {number} page - 页码
- * 
- * 后端 Flask API 应返回如下结构的 JSON：
- * {
- *   "total": 50, // 文章总数
- *   "articles": [
- *     { 
- *       "abbrlink": "a3d799f8", 
- *       "title": "安装wslg fedora后一些配置", 
- *       "publishedDate": "2023-04-30", 
- *       "category": "WSL",
- *       "summary": "由于受不了Fedora KED的缩放(在笔记本屏幕上不启用缩放感觉字体实在太小...)，就重新回到windows了。但是又希望用到linux下的开发环境，这时wsl就很合适了..."
- *     },
- *     // ... more articles
- *   ]
- * }
- */
 const fetchArticles = async (page = 1) => {
   loading.value = true;
   try {
-    const response = await axios.get('/api/posts', {
-      params: {
-        page: page,
-        size: pageSize.value
-      }
-    });
-    // 更新响应式数据
-
-    articleList.value = response.data.articles;
-    total.value = response.data.total;
+    const data = await listPosts({ page, size: pageSize.value });
+    articleList.value = data.articles || [];
+    total.value = data.total || 0;
     currentPage.value = page;
-
   } catch (error) {
-    console.error("获取文章列表失败:", error);
+    console.error('获取文章列表失败:', error);
+    articleList.value = [];
+    total.value = 0;
   } finally {
     loading.value = false;
   }
 };
 
-// --- 事件处理 ---
-
 const handleCurrentChange = (val) => {
-  window.scrollTo(0, 0); // 翻页后自动滚动到页面顶部
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   fetchArticles(val);
 };
-
-// --- 生命周期函数 ---
 
 onMounted(() => {
   fetchArticles(currentPage.value);
@@ -70,17 +36,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="home-container">
-    <!-- 加载时的骨架屏 -->
-    <div v-if="loading">
-      <el-card v-for="i in 5" :key="i" class="post-card" shadow="hover">
+  <main class="home-container">
+    <header class="page-heading">
+      <h1>文章</h1>
+      <p>按发布时间倒序整理的技术笔记。</p>
+    </header>
+
+    <div v-if="loading" class="post-list">
+      <article v-for="i in 5" :key="i" class="post-item skeleton-item">
         <el-skeleton :rows="4" animated />
-      </el-card>
+      </article>
     </div>
 
-    <!-- 文章列表 -->
-    <div v-else>
-      <el-card v-for="article in articleList" :key="article.slug" class="post-card" shadow="hover">
+    <el-empty v-else-if="!articleList.length" description="暂无文章" />
+
+    <div v-else class="post-list">
+      <article v-for="article in articleList" :key="article.slug" class="post-item">
         <h2 class="article-title">
           <router-link
             :to="{ name: 'PostDetail', params: { slug: article.slug } }"
@@ -92,29 +63,24 @@ onMounted(() => {
         <div class="article-meta-wrap">
           <span class="post-meta-item">
             <el-icon><Calendar /></el-icon>
-            <span class="meta-label">发表于</span>
-            <time>{{ article.date}}</time>
+            <time>{{ new Date(article.date).toLocaleDateString() }}</time>
           </span>
           <span class="post-meta-item">
             <el-icon><CollectionTag /></el-icon>
-            <span class="meta-label">分类于</span>
-            <!-- 分类也可以做成一个链接 -->
             <span class="category-link">{{ article.categories?.join?.(' / ') || '未分类' }}</span>
           </span>
           <span v-if="article.tags?.length" class="post-meta-item tags">
             <el-tag v-for="tag in article.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
           </span>
         </div>
-        <div class="content">
+        <p class="summary">
           {{ article.summary }}
-        </div>
-      </el-card>
+        </p>
+      </article>
     </div>
 
-    <!-- 分页控件 -->
     <div class="pagination-container" v-if="!loading && total > 0">
       <el-pagination
-        background
         :current-page="currentPage"
         :page-size="pageSize"
         :total="total"
@@ -122,49 +88,77 @@ onMounted(() => {
         @current-change="handleCurrentChange"
       />
     </div>
-  </div>
+  </main>
 </template>
 
 <style scoped>
 .home-container {
-  padding: 20px 5%; /* 使用百分比边距，适应不同屏幕宽度 */
-  max-width: 900px; /* 设置最大宽度，防止在大屏幕上内容过宽 */
-  margin: 0 auto; /* 居中显示 */
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 36px 24px 56px;
+  text-align: left;
 }
 
-.post-card {
-  margin-bottom: 25px;
+.page-heading {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--blog-border);
+}
+
+.page-heading h1 {
+  margin: 0 0 8px;
+  color: var(--blog-text);
+  font-size: 30px;
+  line-height: 1.25;
+}
+
+.page-heading p {
+  margin: 0;
+  color: var(--blog-muted);
+}
+
+.post-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.post-item {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--blog-border);
+}
+
+.skeleton-item {
+  min-height: 132px;
 }
 
 .article-title {
-  margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 1.8em;
+  margin: 0 0 10px;
+  font-size: 23px;
+  line-height: 1.35;
 }
 
 .title-link {
-  color: #303133;
+  color: var(--blog-text);
   text-decoration: none;
-  transition: color 0.3s;
+  transition: color .2s ease;
 }
 
 .title-link:hover {
-  color: #409eff;
+  color: var(--blog-accent);
 }
 
 .article-meta-wrap {
-  color: #909399;
-  font-size: 0.9em;
   display: flex;
   align-items: center;
-  flex-wrap: wrap; /* 在小屏幕上换行 */
-  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  color: var(--blog-muted);
+  font-size: 14px;
 }
 
 .post-meta-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  margin-right: 20px;
+  gap: 5px;
 }
 
 .post-meta-item.tags {
@@ -172,21 +166,17 @@ onMounted(() => {
 }
 
 .post-meta-item .el-icon {
-  margin-right: 5px;
+  color: var(--blog-muted);
 }
 
 .category-link {
-  color: #909399;
+  color: inherit;
   text-decoration: none;
-  transition: color 0.3s;
 }
 
-.category-link:hover {
-  color: #409eff;
-}
-
-.content {
-  color: #606266;
+.summary {
+  margin: 14px 0 0;
+  color: var(--blog-subtle);
   line-height: 1.6;
 }
 
@@ -194,5 +184,15 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 30px;
+}
+
+@media (max-width: 640px) {
+  .home-container {
+    padding: 26px 18px 42px;
+  }
+
+  .article-title {
+    font-size: 20px;
+  }
 }
 </style>

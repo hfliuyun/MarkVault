@@ -93,8 +93,8 @@ const goEdit = () => {
   justify-content: space-between;
   align-items: center;
   padding-right: 20px;
-  background-color: #fff;
-  border-bottom: 1px solid #eee;
+  background-color: var(--blog-surface);
+  border-bottom: 1px solid var(--blog-border);
 }
 
 .el-menu-demo {

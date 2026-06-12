@@ -1,9 +1,9 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import axios from 'axios';
 import renderMathInElement from 'katex/dist/contrib/auto-render';
 import hljs from 'highlight.js';
+import { getLegacyPost, getPost } from '@/api/posts';
 
 import 'highlight.js/styles/atom-one-dark.css';
 import 'katex/dist/katex.min.css';
@@ -14,10 +14,31 @@ const loading = ref(true);
 const sidebarCollapsed = ref(false);
 const markdownContainer = ref(null);
 
+const formatDate = (dateText) => {
+  if (!dateText) return '';
+  return new Date(dateText).toLocaleDateString();
+};
+
+const scrollToHeading = (headingId) => {
+  const heading = document.getElementById(headingId);
+  if (!heading) {
+    return;
+  }
+  heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
 const enhanceMarkdownContent = () => {
   if (!markdownContainer.value) {
     return;
   }
+
+  markdownContainer.value.querySelectorAll('.code-block-wrapper').forEach((wrapper) => {
+    const pre = wrapper.querySelector('pre');
+    if (pre && wrapper.parentNode) {
+      wrapper.parentNode.insertBefore(pre, wrapper);
+    }
+    wrapper.remove();
+  });
 
   renderMathInElement(markdownContainer.value, {
     delimiters: [
@@ -56,18 +77,19 @@ const enhanceMarkdownContent = () => {
       const codeToCopy = codeBlock.innerText;
       try {
         await navigator.clipboard.writeText(codeToCopy);
-        copyBtn.textContent = 'Copied!';
+        copyBtn.textContent = '已复制';
         copyBtn.classList.add('copied');
       } catch (err) {
-        copyBtn.textContent = 'Failed!';
+        copyBtn.textContent = '失败';
       } finally {
         setTimeout(() => {
-          copyBtn.textContent = 'Copy';
+          copyBtn.textContent = '复制';
           copyBtn.classList.remove('copied');
         }, 2000);
       }
     });
 
+    copyBtn.textContent = '复制';
     wrapper.appendChild(copyBtn);
   });
 };
@@ -77,11 +99,9 @@ const fetchArticle = async () => {
   article.value = null;
 
   try {
-    const endpoint = route.params.slug
-      ? `/api/posts/${route.params.slug}`
-      : `/api/p/${route.params.abbrlink}`;
-    const response = await axios.get(endpoint);
-    article.value = response.data;
+    article.value = route.params.slug
+      ? await getPost(route.params.slug)
+      : await getLegacyPost(route.params.abbrlink);
   } catch (error) {
     console.error('获取文章详情失败:', error);
   } finally {
@@ -101,7 +121,7 @@ watch(() => route.fullPath, fetchArticle);
 <template>
   <div class="post-page-container">
     <div v-if="loading" class="post-content-card">
-      <el-skeleton :rows="1" animated class="title-skeleton"/>
+      <el-skeleton :rows="1" animated class="title-skeleton" />
       <el-skeleton :rows="10" animated />
     </div>
 
@@ -121,6 +141,7 @@ watch(() => route.fullPath, fetchArticle);
                 :class="{ active: item.slug === article.slug }"
               >
                 <router-link :to="{ name: 'PostDetail', params: { slug: item.slug } }">
+                  <span v-if="item.series?.order" class="series-order">{{ item.series.order }}</span>
                   {{ item.title }}
                 </router-link>
               </li>
@@ -130,14 +151,15 @@ watch(() => route.fullPath, fetchArticle);
           <section v-if="article.toc?.length" class="sidebar-section">
             <h2>目录</h2>
             <nav class="toc-list">
-              <a
+              <button
                 v-for="item in article.toc"
                 :key="item.id"
-                :href="`#${item.id}`"
+                type="button"
                 :class="`level-${item.level}`"
+                @click="scrollToHeading(item.id)"
               >
                 {{ item.title }}
-              </a>
+              </button>
             </nav>
           </section>
         </div>
@@ -146,7 +168,7 @@ watch(() => route.fullPath, fetchArticle);
       <article class="post-content-card">
         <h1 class="post-title">{{ article.title }}</h1>
         <div class="post-meta">
-          <span>发布于: {{ new Date(article.date).toLocaleDateString() }}</span>
+          <span v-if="article.date">发布于 {{ formatDate(article.date) }}</span>
           <span v-if="article.categories?.length">分类: {{ article.categories.join(' / ') }}</span>
           <span v-if="article.tags?.length">标签: {{ article.tags.join(' / ') }}</span>
         </div>
@@ -167,17 +189,17 @@ watch(() => route.fullPath, fetchArticle);
 
 <style>
 .post-page-container {
-  padding: 24px;
-  background-color: #f4f5f7;
+  padding: 32px 24px 56px;
+  background-color: var(--blog-bg);
   min-height: calc(100vh - 61px);
 }
 
 .post-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(0, 900px);
+  grid-template-columns: minmax(190px, 260px) minmax(0, 860px);
   align-items: start;
   justify-content: center;
-  gap: 24px;
+  gap: 28px;
 }
 
 .post-sidebar {
@@ -185,9 +207,9 @@ watch(() => route.fullPath, fetchArticle);
   top: 84px;
   max-height: calc(100vh - 108px);
   overflow: auto;
-  padding: 16px;
-  background: #fff;
-  border: 1px solid #ebeef5;
+  padding: 14px;
+  background: var(--blog-surface);
+  border: 1px solid var(--blog-border);
   border-radius: 8px;
   text-align: left;
 }
@@ -199,10 +221,11 @@ watch(() => route.fullPath, fetchArticle);
 
 .sidebar-toggle {
   width: 100%;
-  border: 1px solid #dcdfe6;
-  background: #fff;
+  border: 1px solid var(--blog-border);
+  background: var(--blog-surface);
   border-radius: 4px;
   padding: 6px 8px;
+  color: var(--blog-subtle);
   cursor: pointer;
 }
 
@@ -213,26 +236,40 @@ watch(() => route.fullPath, fetchArticle);
 .sidebar-section h2 {
   margin: 0 0 10px;
   font-size: 15px;
-  color: #303133;
+  color: var(--blog-text);
 }
 
 .series-list {
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
 }
 
 .series-list li {
-  margin-bottom: 8px;
-  color: #606266;
+  margin-bottom: 6px;
+  color: var(--blog-subtle);
+}
+
+.series-list a {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  line-height: 1.45;
 }
 
 .series-list li.active a {
-  color: #409eff;
+  color: var(--blog-accent);
   font-weight: 600;
 }
 
+.series-order {
+  min-width: 18px;
+  color: var(--blog-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .series-list a,
-.toc-list a {
+.toc-list button {
   color: inherit;
   text-decoration: none;
 }
@@ -243,9 +280,15 @@ watch(() => route.fullPath, fetchArticle);
   gap: 7px;
 }
 
-.toc-list a {
-  color: #606266;
+.toc-list button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--blog-subtle);
   font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
 }
 
 .toc-list .level-3 {
@@ -259,47 +302,96 @@ watch(() => route.fullPath, fetchArticle);
 }
 
 .post-content-card {
-  max-width: 900px;
+  max-width: 860px;
   width: 100%;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 30px 40px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, .1);
+  padding: 0;
+  background-color: transparent;
   text-align: left;
 }
 
 .post-title {
-  font-size: 2.2em;
-  margin-bottom: 10px;
+  margin: 0 0 12px;
+  color: var(--blog-text);
+  font-size: 36px;
+  line-height: 1.25;
   font-weight: 600;
-  color: #2c3e50;
 }
 
 .post-meta {
-  color: #909399;
-  font-size: .9em;
-  margin-bottom: 40px;
-  border-bottom: 1px solid #eaecef;
-  padding-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  color: var(--blog-muted);
+  font-size: 14px;
+  margin-bottom: 34px;
+  border-bottom: 1px solid var(--blog-border);
+  padding-bottom: 18px;
 }
 
 .post-meta span {
-  margin-right: 20px;
+  margin-right: 0;
 }
 
 .markdown-body {
-  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-  line-height: 1.7;
-  color: #333;
+  font-family: var(--blog-font);
+  line-height: 1.75;
+  color: var(--blog-text);
   font-size: 16px;
   overflow-wrap: break-word;
 }
 
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  color: var(--blog-text);
+  line-height: 1.35;
+}
+
 .markdown-body h2 {
-  padding-bottom: .3em;
-  border-bottom: 1px solid #eaecef;
+  margin-top: 2em;
+  padding-bottom: .35em;
+  border-bottom: 1px solid var(--blog-border);
+}
+
+.markdown-body p,
+.markdown-body li {
+  color: var(--blog-subtle);
+}
+
+.markdown-body a {
+  color: var(--blog-accent);
+}
+
+.markdown-body blockquote {
+  margin: 1.4em 0;
+  padding: 2px 0 2px 16px;
+  color: var(--blog-muted);
+  border-left: 3px solid var(--blog-border-strong);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.4em 0;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 8px 10px;
+  border: 1px solid var(--blog-border);
+}
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
 }
 
 .code-block-wrapper {
@@ -311,13 +403,13 @@ watch(() => route.fullPath, fetchArticle);
   margin: 0 !important;
   border-radius: 6px;
   overflow: hidden;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
 }
 
 .markdown-body pre code.hljs {
   display: block;
   padding: 1.2em 1.5em;
+  overflow-x: auto;
 }
 
 .copy-code-btn {
@@ -362,7 +454,7 @@ watch(() => route.fullPath, fetchArticle);
 
 @media (max-width: 860px) {
   .post-page-container {
-    padding: 16px;
+    padding: 18px;
   }
 
   .post-layout {
@@ -372,6 +464,7 @@ watch(() => route.fullPath, fetchArticle);
   .post-sidebar {
     position: static;
     max-height: none;
+    order: -1;
   }
 
   .post-sidebar.collapsed {
@@ -379,7 +472,11 @@ watch(() => route.fullPath, fetchArticle);
   }
 
   .post-content-card {
-    padding: 24px 20px;
+    padding: 0;
+  }
+
+  .post-title {
+    font-size: 30px;
   }
 }
 </style>
