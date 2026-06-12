@@ -13,6 +13,8 @@ content/posts/logistic-regression/
 
 Legacy posts can be backed up under `content/legacy/old-posts/`. They are not indexed by the new APIs.
 
+If content is stored in a separate repository, mount it at the code repository's `content/` path or point `BLOG_CONTENT_ROOT` to the external location.
+
 ## Frontmatter Schema
 
 Required fields:

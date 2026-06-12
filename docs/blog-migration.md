@@ -7,7 +7,7 @@ The old backend reads Markdown files directly from `server_flask/posts/*.md`. Th
 - `GET /api/posts_list_metadata`
 - `GET /api/p/:abbrlink`
 
-The new implementation reads `content/posts/*/index.md` through the content index service.
+The new implementation reads `content/posts/*/index.md` through the content index service. In a split-repo setup, `content/` in the code repository is a mount point or symlink to an external content repository.
 
 ## Migration Steps
 
@@ -50,6 +50,12 @@ The new implementation reads `content/posts/*/index.md` through the content inde
    /series/:series_id
    ```
 
+7. Configure the runtime content path:
+
+   ```sh
+   export BLOG_CONTENT_ROOT=/home/aa/code/blog-content
+   ```
+
 ## Acceptance Checklist
 
 - `content/posts/` exists.
@@ -59,6 +65,7 @@ The new implementation reads `content/posts/*/index.md` through the content inde
 - The homepage links to `/posts/:slug`.
 - Series pages show grouped series posts.
 - Code highlighting, math rendering, and code copy still work in post detail pages.
+- The backend can read the content tree from either `BLOG_CONTENT_ROOT` or the local `content/` mount.
 
 ## Rollback Notes
 

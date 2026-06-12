@@ -4,6 +4,8 @@
 
 Markdown files are the source of truth for the blog. Databases, generated JSON files, caches, search indexes, and Notion pages are derived data and must be rebuildable from `content/`.
 
+In day-to-day development, the repository in this workspace only owns the blog code. The content tree can live in a separate Git repository and be mounted into the codebase via `BLOG_CONTENT_ROOT` or a local `content/` symlink.
+
 ## Content Layout
 
 ```text
@@ -28,7 +30,7 @@ The Flask API is split into route handlers and services:
 - `server_flask/app/services/media.py` rewrites local image links and serves post images.
 - `server_flask/app/models/post.py` defines the internal post model.
 
-The content root is configured in `server_flask/app/__init__.py` as the repository-level `content/` directory.
+The content root is configured in `server_flask/app/__init__.py`. It uses `BLOG_CONTENT_ROOT` when set, otherwise falls back to the repository-level `content/` directory.
 
 ## Data Flow
 

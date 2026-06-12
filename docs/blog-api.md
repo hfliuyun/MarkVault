@@ -2,6 +2,8 @@
 
 All routes are mounted under `/api`.
 
+The public blog APIs read Markdown content from `BLOG_CONTENT_ROOT` when that environment variable is set. If it is unset, the backend falls back to the local `content/` path.
+
 ## `GET /api/posts`
 
 Returns a paginated post list sorted by `date` descending.
