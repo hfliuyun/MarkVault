@@ -1,0 +1,16 @@
+<type>: <short imperative summary>
+
+Summary:
+- <What feature was added or what bug was fixed.>
+- <Why this change is needed or what user-visible behavior changes.>
+
+Implementation:
+- <How the change is implemented at a high level.>
+- <Important modules, APIs, data flow, or compatibility notes.>
+
+Tests:
+- <Automated checks run, for example: npm run build.>
+- <Manual verification or scenario tested.>
+
+Notes:
+- <Known limitations, follow-up work, or "None".>
