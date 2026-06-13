@@ -2,7 +2,7 @@
 
 ## Directory Structure
 
-New posts live under `content/posts/`:
+Standalone posts live under `content/posts/`:
 
 ```text
 content/posts/logistic-regression/
@@ -10,6 +10,17 @@ content/posts/logistic-regression/
   images/
     sigmoid.png
 ```
+
+Series posts can be grouped under `content/series/<series-id>/`:
+
+```text
+content/series/machine-learning-basic/logistic-regression/
+  index.md
+  images/
+    sigmoid.png
+```
+
+The folder path is only for local organization. Public URLs still use the `slug` from frontmatter, and series membership still comes from the `series` metadata.
 
 Legacy posts can be backed up under `content/legacy/old-posts/`. They are not indexed by the new APIs.
 
@@ -82,6 +93,7 @@ Put images in the post folder:
 
 ```text
 content/posts/logistic-regression/images/sigmoid.png
+content/series/machine-learning-basic/logistic-regression/images/sigmoid.png
 ```
 
 Reference images with a relative path:

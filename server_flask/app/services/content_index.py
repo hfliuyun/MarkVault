@@ -35,6 +35,7 @@ class ContentIndex:
     def __init__(self, content_root: Path):
         self.content_root = content_root
         self.posts_root = content_root / "posts"
+        self.series_root = content_root / "series"
         self.posts_by_slug: dict[str, Post] = {}
         self.posts: list[Post] = []
         self.series_by_id: dict[str, dict[str, Any]] = {}
@@ -125,13 +126,16 @@ class ContentIndex:
     def list_tags(self) -> dict[str, Any]:
         return {"tags": self._serialize_taxonomy(self.tags)}
 
-    def _load_posts(self) -> list[Post]:
-        if not self.posts_root.exists():
-            return []
+    def get_post_image_dir(self, slug: str) -> Path | None:
+        post = self.posts_by_slug.get(slug)
+        if not post:
+            return None
+        return post.source_path.parent / "images"
 
+    def _load_posts(self) -> list[Post]:
         posts: list[Post] = []
         seen_slugs: dict[str, Path] = {}
-        for index_path in sorted(self.posts_root.glob("*/index.md")):
+        for index_path in self._iter_post_index_paths():
             post = self._load_post(index_path)
             if post.slug in seen_slugs:
                 first_path = seen_slugs[post.slug]
@@ -143,20 +147,24 @@ class ContentIndex:
         return posts
 
     def _build_content_signature(self) -> tuple[tuple[str, int, int], ...]:
-        if not self.posts_root.exists():
-            return ()
-
         signature = []
-        for index_path in sorted(self.posts_root.glob("*/index.md")):
+        for index_path in self._iter_post_index_paths():
             stat = index_path.stat()
             signature.append(
                 (
-                    index_path.relative_to(self.posts_root).as_posix(),
+                    index_path.relative_to(self.content_root).as_posix(),
                     stat.st_mtime_ns,
                     stat.st_size,
                 )
             )
         return tuple(signature)
+
+    def _iter_post_index_paths(self) -> list[Path]:
+        paths = [
+            *self.posts_root.glob("*/index.md"),
+            *self.series_root.glob("*/*/index.md"),
+        ]
+        return sorted(paths, key=lambda path: path.relative_to(self.content_root).as_posix())
 
     def _load_post(self, index_path: Path) -> Post:
         parsed = frontmatter.load(index_path)

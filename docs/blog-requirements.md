@@ -2,6 +2,133 @@
 
 本文档记录博客后续重构需求，用于后续分析、实现或交给其他 AI / 开发者继续推进。
 
+## 0. 当前实现状态与后续单点需求
+
+本章节基于当前代码实现维护进度。后续每次只选择一个待实现需求推进，完成后更新本章节状态，再提交代码。
+
+### 0.1 已完成基础能力
+
+- 已将博客主数据源切换为 Markdown 内容目录：默认读取仓库级 `content/`，也支持通过 `BLOG_CONTENT_ROOT` 指向外部内容仓库。
+- 已实现后端内容索引层：扫描 `content/posts/*/index.md` 和 `content/series/*/*/index.md`，解析 frontmatter，校验 `title`、`slug`、`date`，检查重复 `slug`，构建文章、系列、分类和标签索引。
+- 已实现新博客 API：`GET /api/posts`、`GET /api/posts/:slug`、`GET /api/series`、`GET /api/series/:series_id`、`GET /api/categories`、`GET /api/tags`、`GET /api/media/posts/:slug/images/:filename`。
+- 已保留旧兼容 API：`GET /api/posts_list_metadata`、`GET /api/p/:abbrlink`、`GET /api/md/:abbrlink`、`POST /api/upload_image`、`POST /api/save_post`。
+- 已实现内容热加载：修改、新增或删除 `content/posts/*/index.md` 或 `content/series/*/*/index.md` 后，下一次新博客 API 请求会自动刷新内存索引，不需要重启 Flask。
+- 已支持系列文件夹内容结构：系列文章可放在 `content/series/<series-id>/<slug>/index.md`，图片仍通过 `/api/media/posts/:slug/images/:filename` 访问。
+- 已实现前端新路由和 API 调用层：`/`、`/posts/:slug`、`/series`、`/series/:seriesId`，并抽离 `src/api/posts.js` 和 `src/api/series.js`。
+- 已实现首页、文章详情页、系列列表页、系列详情页的基础阅读体验。
+- 已实现文章详情页的 Markdown HTML 渲染、代码高亮、数学公式渲染、代码复制、系列侧边栏和正文目录 TOC。
+- 已修复 hash 路由下 TOC 跳转问题：目录点击会保留当前文章路由并使用 `/#/posts/:slug#heading` 形式定位正文标题。
+- 已初步统一首页、文章详情页、系列页的视觉风格，使用技术笔记 / 文档站风格的全局设计变量。
+- 已添加标准 commit message 模板 `.gitmessage`，当前仓库本地已配置 `git config commit.template .gitmessage`。
+
+### 0.2 待实现需求清单
+
+#### 0.2.1 写文章模板生成器
+
+- 目标：提供轻量命令生成新文章目录和初始 Markdown 文件。
+- 范围：新增命令，例如 `python manage.py new_post "标题" --slug example-slug`，生成 `content/posts/<slug>/index.md` 和 `images/`。
+- 验收标准：
+  - 生成的 `index.md` 包含合法 frontmatter：`title`、`slug`、`date`、`summary`、`categories`、`tags`，可选 `series`。
+  - 如果目标 slug 已存在，命令应拒绝覆盖并给出明确错误。
+  - 生成后访问 `/api/posts` 能看到新文章，不需要重启 Flask。
+
+#### 0.2.2 分类和标签页面
+
+- 目标：前端支持按分类和标签浏览文章。
+- 范围：新增 `/categories`、`/categories/:category`、`/tags`、`/tags/:tag` 页面；复用现有 `/api/categories` 和 `/api/tags`。
+- 验收标准：
+  - 分类页展示所有分类及文章数量。
+  - 标签页展示所有标签及文章数量。
+  - 分类详情和标签详情能列出相关文章并跳转到 `/posts/:slug`。
+  - 首页和文章详情页中的分类、标签可以跳转到对应页面。
+
+#### 0.2.3 搜索功能
+
+- 目标：支持按关键词搜索博客文章。
+- 范围：新增 `GET /api/search?q=keyword`，前端导航搜索入口接入该接口。
+- 验收标准：
+  - 可搜索标题、摘要、正文、分类和标签。
+  - 搜索结果展示标题、摘要、日期、分类、标签，并能跳转文章详情。
+  - 空关键词返回空结果或明确提示，不返回 500。
+
+#### 0.2.4 旧链接兼容跳转
+
+- 目标：让旧 `/p/:abbrlink` 链接尽量跳转到新 `/posts/:slug`。
+- 范围：建立旧 `abbrlink` 到新 `slug` 的映射策略，可从已迁移文章 metadata 或映射文件读取。
+- 验收标准：
+  - 已迁移旧文章访问 `/p/:abbrlink` 时跳转到 `/posts/:slug`。
+  - 未迁移旧文章返回明确的 404 或归档提示。
+  - 不再使用 Python `hash(title)` 作为长期链接依据。
+
+#### 0.2.5 文章详情组件拆分
+
+- 目标：降低 `Post.vue` 复杂度，便于后续维护。
+- 范围：拆出文章布局、系列侧边栏、TOC、metadata、正文增强逻辑等组件或 composable。
+- 验收标准：
+  - 文章详情页现有行为保持不变。
+  - TOC 跳转、代码复制、数学公式、代码高亮仍正常。
+  - `Post.vue` 只保留页面级数据加载和组件组合逻辑。
+
+#### 0.2.6 移动端文章侧边栏优化
+
+- 目标：改善手机宽度下系列目录和正文目录的阅读体验。
+- 范围：将移动端侧边栏改为折叠面板或抽屉，不挤占正文阅读区。
+- 验收标准：
+  - 手机宽度下文章正文优先展示。
+  - 系列目录和 TOC 可展开查看。
+  - 点击 TOC 后能定位标题并自动收起或不遮挡正文。
+
+#### 0.2.7 Markdown HTML 安全清洗
+
+- 目标：降低后端 Markdown 渲染和前端 `v-html` 带来的脚本注入风险。
+- 范围：在后端渲染后增加 HTML 清洗，或约束 Markdown 渲染输出的安全标签和属性。
+- 验收标准：
+  - Markdown 中的 `<script>`、事件属性等危险内容不会在浏览器执行。
+  - 常用 Markdown 内容、代码块、表格、公式、图片仍正常显示。
+  - 安全策略写入文档，明确允许和禁止的 HTML 范围。
+
+#### 0.2.8 本地图片写作和上传链路
+
+- 目标：让图片写入文章自己的 `images/` 目录，而不是旧 `server_flask/static/image/`。
+- 范围：改造或新增写作辅助上传接口，使图片保存到 `content/posts/<slug>/images/`。
+- 验收标准：
+  - Markdown 中插入 `![alt](images/file.png)`。
+  - 前端文章详情通过 `/api/media/posts/:slug/images/:filename` 正常显示图片。
+  - 图片和 Markdown 一起位于内容仓库，便于整体备份。
+
+#### 0.2.9 Notion 单向同步
+
+- 目标：实现 Markdown 到 Notion 的展示 / 备份同步。
+- 范围：新增同步脚本或命令，扫描 `content/posts/`，创建或更新 Notion 页面，并写回 `notion.page_id`、`notion.synced_at`。
+- 验收标准：
+  - 没有 `notion.page_id` 的文章可以创建 Notion 页面。
+  - 已有 `notion.page_id` 的文章可以更新对应 Notion 页面。
+  - Markdown 仍然是第一主数据源，删除 Notion 或缓存不影响博客可用性。
+
+#### 0.2.10 测试补强
+
+- 目标：为核心内容系统补充自动化测试，降低后续改动风险。
+- 范围：优先覆盖内容索引、重复 slug、frontmatter 校验、媒体路径、搜索、模板生成器。
+- 验收标准：
+  - 新增测试可通过单一命令运行。
+  - 关键异常场景有明确断言。
+  - 后续实现每个单点需求时同步补充对应测试。
+
+### 0.3 推荐实现顺序
+
+后续建议按以下顺序推进，每次只实现一个需求点：
+
+1. 写文章模板生成器。
+2. 分类和标签页面。
+3. 搜索功能。
+4. 旧链接兼容跳转。
+5. 文章详情组件拆分。
+6. 移动端文章侧边栏优化。
+7. Markdown HTML 安全清洗。
+8. 本地图片写作和上传链路。
+9. 测试补强。
+10. Notion 单向同步。
+
 ## 1. 核心目标
 
 博客的唯一真实数据源必须是 Markdown 文件。

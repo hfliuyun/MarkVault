@@ -16,8 +16,10 @@ def rewrite_local_image_paths(markdown_text: str, slug: str) -> str:
     return LOCAL_IMAGE_RE.sub(replace, markdown_text)
 
 
-def send_post_image(content_root: Path, slug: str, filename: str):
-    image_dir = content_root / "posts" / slug / "images"
+def send_post_image(image_dir: Path | None, filename: str):
+    if image_dir is None:
+        raise NotFound()
+
     image_path = image_dir / filename
     try:
         image_path.resolve().relative_to(image_dir.resolve())

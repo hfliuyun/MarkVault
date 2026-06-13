@@ -169,7 +169,11 @@ def get_tags():
 
 @api_bp.route('/media/posts/<slug>/images/<path:filename>', methods=['GET'])
 def get_post_media(slug, filename):
-    return send_post_image(current_app.config["CONTENT_ROOT"], slug, filename)
+    try:
+        image_dir = get_content_index().get_post_image_dir(slug)
+    except ContentIndexError as error:
+        return content_error_response(error)
+    return send_post_image(image_dir, filename)
 
 @api_bp.route('/p/<string:abbrlink>', methods=['GET'])
 def get_post_by_abbrlink_route(abbrlink):

@@ -14,11 +14,16 @@ content/
     post-slug/
       index.md
       images/
+  series/
+    series-id/
+      post-slug/
+        index.md
+        images/
   legacy/
     old-posts/
 ```
 
-Only `content/posts/*/index.md` is indexed by the new blog APIs. `content/legacy/` is a file backup area and is not scanned.
+The new blog APIs index `content/posts/*/index.md` and `content/series/*/*/index.md`. The `series/` folder is only an organization aid; post URLs still come from frontmatter `slug`, and series membership still comes from frontmatter `series`. `content/legacy/` is a file backup area and is not scanned.
 
 ## Backend Layers
 
@@ -36,6 +41,7 @@ The content root is configured in `server_flask/app/__init__.py`. It uses `BLOG_
 
 ```text
 content/posts/*/index.md
+content/series/*/*/index.md
   -> ContentIndex
   -> Flask API
   -> Vue routes and views
