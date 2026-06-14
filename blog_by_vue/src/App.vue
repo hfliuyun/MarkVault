@@ -4,24 +4,26 @@ import PageHeader from './components/PageHeader.vue';
 </script>
 
 <template>
-  <div>
+  <div class="aurora-bg"></div>
+  <div class="app-wrapper">
     <PageHeader />
      
-    <router-view />
+    <main class="main-content">
+      <router-view />
+    </main>
   </div>
 </template>
 
 <style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
+
+.main-content {
+  flex-grow: 1;
+  width: 100%;
+  padding: 100px 20px 60px; /* Top padding to prevent overlap with fixed header */
 }
 </style>

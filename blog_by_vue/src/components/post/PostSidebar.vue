@@ -42,10 +42,10 @@ watch(() => props.article.slug, closeDrawer);
 </script>
 
 <template>
-  <div class="post-sidebar-shell" :class="{ 'empty-mobile': !hasSidebarContent }">
+  <div class="post-sidebar-shell" :class="{ 'empty-mobile': !hasSidebarContent, 'collapsed': collapsed }">
     <div v-if="hasSidebarContent" class="mobile-sidebar-trigger">
       <button
-        class="mobile-sidebar-button"
+        class="mobile-sidebar-button glass-panel"
         type="button"
         aria-label="打开文章导航"
         @click="drawerVisible = true"
@@ -55,17 +55,18 @@ watch(() => props.article.slug, closeDrawer);
       </button>
     </div>
 
-    <aside class="post-sidebar" :class="{ collapsed }">
-      <button class="sidebar-toggle" type="button" @click="toggleSidebar">
-        {{ collapsed ? '展开' : '收起' }}
+    <aside class="post-sidebar glass-panel" :class="{ collapsed }">
+      <button class="sidebar-toggle glass-panel" type="button" @click="toggleSidebar">
+        {{ collapsed ? '展开' : '收起目录' }}
       </button>
 
-      <PostSidebarContent
-        v-if="!collapsed"
-        :article="article"
-        :active-heading-id="activeHeadingId"
-        @toc-click="handleTocClick"
-      />
+      <div class="sidebar-content-wrapper" v-show="!collapsed">
+        <PostSidebarContent
+          :article="article"
+          :active-heading-id="activeHeadingId"
+          @toc-click="handleTocClick"
+        />
+      </div>
     </aside>
 
     <el-drawer
@@ -88,7 +89,14 @@ watch(() => props.article.slug, closeDrawer);
 
 <style>
 .post-sidebar-shell {
-  min-width: 0;
+  flex: 0 0 280px;
+  width: 280px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.post-sidebar-shell.collapsed {
+  flex: 0 0 64px;
+  width: 64px;
 }
 
 .mobile-sidebar-trigger {
@@ -99,32 +107,59 @@ watch(() => props.article.slug, closeDrawer);
   position: sticky;
   top: 84px;
   max-height: calc(100vh - 108px);
-  overflow: auto;
-  padding: 14px;
-  background: var(--blog-surface);
-  border: 1px solid var(--blog-border);
-  border-radius: 8px;
+  overflow: hidden;
+  padding: 16px;
   text-align: left;
+  display: flex;
+  flex-direction: column;
 }
 
 .post-sidebar.collapsed {
-  width: 54px;
-  padding: 10px;
+  padding: 12px 10px;
+  align-items: center;
 }
 
 .sidebar-toggle {
   width: 100%;
-  border: 1px solid var(--blog-border);
-  background: var(--blog-surface);
-  border-radius: 4px;
-  padding: 6px 8px;
+  padding: 8px;
   color: var(--blog-subtle);
   cursor: pointer;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  flex-shrink: 0;
 }
 
-@media (max-width: 860px) {
+.post-sidebar.collapsed .sidebar-toggle {
+  padding: 8px 4px;
+  font-size: 12px;
+  margin-bottom: 0;
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  height: 100px;
+}
+
+.sidebar-toggle:hover {
+  color: var(--blog-text);
+  background: var(--blog-surface-hover);
+}
+
+.sidebar-content-wrapper {
+  overflow-y: auto;
+  flex: 1;
+}
+
+@media (max-width: 960px) {
   .post-sidebar-shell {
+    flex: none;
+    width: 100%;
     order: -1;
+  }
+
+  .post-sidebar-shell.collapsed {
+    flex: none;
+    width: 100%;
   }
 
   .post-sidebar-shell.empty-mobile {
@@ -144,16 +179,13 @@ watch(() => props.article.slug, closeDrawer);
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid var(--blog-border);
-    border-radius: 6px;
-    padding: 7px 10px;
-    background: var(--blog-surface);
-    color: var(--blog-subtle);
+    padding: 8px 12px;
+    color: var(--blog-text);
     cursor: pointer;
+    font-weight: 500;
   }
 
   .mobile-sidebar-button:hover {
-    border-color: var(--blog-border-strong);
     color: var(--blog-accent);
   }
 

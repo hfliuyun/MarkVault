@@ -105,13 +105,13 @@ watch(() => props.type, fetchTaxonomy);
   <main class="taxonomy-page">
     <div v-if="loading" class="taxonomy-loading">
       <el-skeleton :rows="1" animated class="title-skeleton" />
-      <article v-for="i in 4" :key="i" class="taxonomy-card">
+      <article v-for="i in 4" :key="i" class="taxonomy-card glass-panel">
         <el-skeleton :rows="3" animated />
       </article>
     </div>
 
     <template v-else-if="!detail">
-      <header class="taxonomy-header">
+      <header class="taxonomy-header glass-panel">
         <h1>{{ pageTitle }}</h1>
         <p>{{ pageDescription }}</p>
       </header>
@@ -123,7 +123,7 @@ watch(() => props.type, fetchTaxonomy);
           v-for="item in taxonomyList"
           :key="item.name"
           :to="{ name: config.routeName, params: { [config.paramName]: item.name } }"
-          class="taxonomy-card taxonomy-link"
+          class="taxonomy-card glass-panel taxonomy-link"
         >
           <span class="taxonomy-name">
             <el-icon><component :is="config.icon" /></el-icon>
@@ -134,112 +134,117 @@ watch(() => props.type, fetchTaxonomy);
       </div>
     </template>
 
-    <el-result
-      v-else-if="!currentTaxonomy"
-      icon="error"
-      :title="config.missingTitle"
-      :sub-title="pageDescription"
-    >
-      <template #extra>
-        <router-link :to="config.listRoute">
-          <el-button type="primary">{{ config.backText }}</el-button>
-        </router-link>
-      </template>
-    </el-result>
+    <div v-else-if="!currentTaxonomy" class="glass-panel" style="padding: 40px">
+      <el-result
+        icon="error"
+        :title="config.missingTitle"
+        :sub-title="pageDescription"
+      >
+        <template #extra>
+          <router-link :to="config.listRoute">
+            <el-button type="primary">{{ config.backText }}</el-button>
+          </router-link>
+        </template>
+      </el-result>
+    </div>
 
     <template v-else>
-      <header class="taxonomy-header">
+      <header class="taxonomy-header glass-panel">
         <router-link :to="config.listRoute" class="back-link">{{ config.backText }}</router-link>
         <h1>{{ pageTitle }}</h1>
         <p>{{ pageDescription }}</p>
       </header>
 
-      <article v-for="post in currentTaxonomy.posts" :key="post.slug" class="post-card">
-        <h2>
-          <router-link :to="{ name: 'PostDetail', params: { slug: post.slug } }">
-            {{ post.title }}
-          </router-link>
-        </h2>
-        <div class="post-meta">
-          <span v-if="post.date">
-            <el-icon><Calendar /></el-icon>
-            {{ formatDate(post.date) }}
-          </span>
-          <span v-if="post.categories?.length">
-            <el-icon><CollectionTag /></el-icon>
-            <router-link
-              v-for="category in post.categories"
-              :key="category"
-              :to="{ name: 'CategoryDetail', params: { category } }"
-              class="meta-link category-link"
-            >
-              {{ category }}
+      <div class="post-list">
+        <article v-for="post in currentTaxonomy.posts" :key="post.slug" class="post-card glass-panel">
+          <h2>
+            <router-link :to="{ name: 'PostDetail', params: { slug: post.slug } }">
+              {{ post.title }}
             </router-link>
-          </span>
-          <span v-if="post.tags?.length" class="tag-list">
-            <router-link
-              v-for="tag in post.tags"
-              :key="tag"
-              :to="{ name: 'TagDetail', params: { tag } }"
-              class="tag-link"
-            >
-              {{ tag }}
-            </router-link>
-          </span>
-        </div>
-        <p class="summary">{{ post.summary }}</p>
-      </article>
+          </h2>
+          <div class="post-meta">
+            <span v-if="post.date">
+              <el-icon><Calendar /></el-icon>
+              {{ formatDate(post.date) }}
+            </span>
+            <span v-if="post.categories?.length">
+              <el-icon><CollectionTag /></el-icon>
+              <router-link
+                v-for="category in post.categories"
+                :key="category"
+                :to="{ name: 'CategoryDetail', params: { category } }"
+                class="meta-link category-link"
+              >
+                {{ category }}
+              </router-link>
+            </span>
+            <span v-if="post.tags?.length" class="tag-list">
+              <router-link
+                v-for="tag in post.tags"
+                :key="tag"
+                :to="{ name: 'TagDetail', params: { tag } }"
+                class="tag-link glass-tag"
+              >
+                {{ tag }}
+              </router-link>
+            </span>
+          </div>
+          <p class="summary">{{ post.summary }}</p>
+        </article>
+      </div>
     </template>
   </main>
 </template>
 
 <style scoped>
 .taxonomy-page {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 36px 24px 56px;
+  padding: 0 20px;
   text-align: left;
 }
 
 .taxonomy-header {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--blog-border);
+  padding: 40px;
+  margin-bottom: 30px;
+  text-align: center;
 }
 
 .back-link {
   color: var(--blog-accent);
   font-size: 14px;
   text-decoration: none;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
 }
 
 .taxonomy-header h1 {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   color: var(--blog-text);
-  font-size: 30px;
+  font-size: 36px;
+  font-weight: 700;
   line-height: 1.25;
-}
-
-.back-link + h1 {
-  margin-top: 10px;
+  letter-spacing: -0.5px;
 }
 
 .taxonomy-header p {
   margin: 0;
   color: var(--blog-muted);
+  font-size: 16px;
 }
 
 .taxonomy-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  padding-top: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
 }
 
 .taxonomy-card {
-  padding: 18px 20px;
-  border: 1px solid var(--blog-border);
-  border-radius: 8px;
-  background: var(--blog-surface);
+  padding: 24px;
 }
 
 .taxonomy-link {
@@ -249,19 +254,13 @@ watch(() => props.type, fetchTaxonomy);
   gap: 14px;
   color: inherit;
   text-decoration: none;
-  transition: border-color .2s ease, color .2s ease;
-}
-
-.taxonomy-link:hover {
-  color: var(--blog-accent);
-  border-color: var(--blog-border-strong);
 }
 
 .taxonomy-name {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  gap: 7px;
+  gap: 10px;
   font-size: 18px;
   font-weight: 600;
 }
@@ -281,31 +280,43 @@ watch(() => props.type, fetchTaxonomy);
   gap: 16px;
 }
 
+.post-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .post-card {
-  padding: 22px 0;
-  border-bottom: 1px solid var(--blog-border);
+  padding: 32px;
+  text-decoration: none;
+  display: block;
+}
+
+.post-card:hover {
+  transform: translateY(-4px);
 }
 
 .post-card h2 {
-  margin: 0 0 12px;
-  font-size: 22px;
+  margin: 0 0 14px;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .post-card h2 a {
   color: var(--blog-text);
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .post-card h2 a:hover,
-.meta-link:hover,
-.tag-link:hover {
+.meta-link:hover {
   color: var(--blog-accent);
 }
 
 .post-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: 12px 20px;
   color: var(--blog-muted);
   font-size: 14px;
 }
@@ -314,49 +325,70 @@ watch(() => props.type, fetchTaxonomy);
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
 }
 
-.meta-link,
-.tag-link {
+.meta-link {
   color: inherit;
   text-decoration: none;
+  transition: color 0.2s;
 }
 
 .category-link:not(:last-child)::after {
   content: "/";
   padding-left: 7px;
   color: var(--blog-muted);
+  pointer-events: none;
 }
 
 .tag-list {
-  gap: 6px;
+  gap: 8px;
 }
 
 .tag-link {
   display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--blog-border);
-  border-radius: 4px;
-  background: var(--blog-surface);
+  text-decoration: none;
+}
+
+.glass-tag {
+  padding: 4px 10px;
+  background: rgba(120, 120, 120, 0.1);
+  border: 1px solid rgba(120, 120, 120, 0.2);
+  border-radius: 12px;
   font-size: 12px;
+  color: var(--blog-text);
+  transition: all 0.2s;
+}
+
+[data-theme='dark'] .glass-tag {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tag-link:hover.glass-tag {
+  background: var(--blog-accent);
+  color: #fff;
+  border-color: var(--blog-accent);
 }
 
 .summary {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   color: var(--blog-subtle);
   line-height: 1.6;
+  font-size: 15px;
 }
 
 @media (max-width: 640px) {
   .taxonomy-page {
-    padding: 26px 18px 42px;
+    padding: 0 16px;
   }
 
   .taxonomy-grid {
     grid-template-columns: 1fr;
+  }
+
+  .post-card {
+    padding: 24px 20px;
   }
 
   .post-card h2 {

@@ -43,7 +43,7 @@ onMounted(() => {
     </header>
 
     <div v-if="loading" class="post-list">
-      <article v-for="i in 5" :key="i" class="post-item skeleton-item">
+      <article v-for="i in 5" :key="i" class="post-item glass-panel skeleton-item">
         <el-skeleton :rows="4" animated />
       </article>
     </div>
@@ -51,7 +51,7 @@ onMounted(() => {
     <el-empty v-else-if="!articleList.length" description="暂无文章" />
 
     <div v-else class="post-list">
-      <article v-for="article in articleList" :key="article.slug" class="post-item">
+      <article v-for="article in articleList" :key="article.slug" class="post-item glass-panel">
         <h2 class="article-title">
           <router-link
             :to="{ name: 'PostDetail', params: { slug: article.slug } }"
@@ -86,7 +86,7 @@ onMounted(() => {
               :to="{ name: 'TagDetail', params: { tag } }"
               class="tag-link"
             >
-              <el-tag size="small" effect="plain">{{ tag }}</el-tag>
+              <span class="glass-tag">{{ tag }}</span>
             </router-link>
           </span>
         </div>
@@ -96,7 +96,7 @@ onMounted(() => {
       </article>
     </div>
 
-    <div class="pagination-container" v-if="!loading && total > 0">
+    <div class="pagination-container glass-panel" v-if="!loading && total > 0">
       <el-pagination
         :current-page="currentPage"
         :page-size="pageSize"
@@ -110,53 +110,74 @@ onMounted(() => {
 
 <style scoped>
 .home-container {
-  max-width: 880px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 36px 24px 56px;
+  padding: 0 20px;
   text-align: left;
 }
 
 .page-heading {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--blog-border);
+  padding-bottom: 30px;
+  margin-bottom: 40px;
+  text-align: center;
 }
 
 .page-heading h1 {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   color: var(--blog-text);
-  font-size: 30px;
+  font-size: 36px;
+  font-weight: 700;
   line-height: 1.25;
+  letter-spacing: -0.5px;
 }
 
 .page-heading p {
   margin: 0;
   color: var(--blog-muted);
+  font-size: 16px;
 }
 
 .post-list {
   display: flex;
   flex-direction: column;
+  gap: 24px; /* Space between glass cards */
 }
 
 .post-item {
-  padding: 24px 0;
-  border-bottom: 1px solid var(--blog-border);
+  padding: 32px;
+  text-decoration: none;
+  display: block;
+}
+
+.post-item:hover {
+  transform: translateY(-4px);
 }
 
 .skeleton-item {
-  min-height: 132px;
+  min-height: 180px;
 }
 
 .article-title {
-  margin: 0 0 10px;
-  font-size: 23px;
-  line-height: 1.35;
+  margin: 0 0 14px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .title-link {
   color: var(--blog-text);
   text-decoration: none;
   transition: color .2s ease;
+}
+
+.title-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1; /* Make the whole card clickable for the title link conceptually, though we only wrap the h2 */
+}
+.post-item {
+  position: relative; /* For the ::before pseudo element if we wanted whole card click */
 }
 
 .title-link:hover {
@@ -167,19 +188,21 @@ onMounted(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px 18px;
+  gap: 12px 20px;
   color: var(--blog-muted);
   font-size: 14px;
+  position: relative;
+  z-index: 2; /* Above the whole card clickable area if implemented */
 }
 
 .post-meta-item {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .post-meta-item.tags {
-  gap: 6px;
+  gap: 8px;
 }
 
 .post-meta-item .el-icon {
@@ -189,6 +212,7 @@ onMounted(() => {
 .category-link {
   color: inherit;
   text-decoration: none;
+  transition: color 0.2s;
 }
 
 .category-list {
@@ -201,6 +225,7 @@ onMounted(() => {
   content: "/";
   padding-left: 7px;
   color: var(--blog-muted);
+  pointer-events: none;
 }
 
 .category-link:hover,
@@ -210,29 +235,60 @@ onMounted(() => {
 
 .tag-link {
   display: inline-flex;
-  color: inherit;
   text-decoration: none;
 }
 
+.glass-tag {
+  padding: 4px 10px;
+  background: rgba(120, 120, 120, 0.1);
+  border: 1px solid rgba(120, 120, 120, 0.2);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--blog-text);
+  transition: all 0.2s;
+}
+
+[data-theme='dark'] .glass-tag {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tag-link:hover .glass-tag {
+  background: var(--blog-accent);
+  color: #fff;
+  border-color: var(--blog-accent);
+}
+
 .summary {
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   color: var(--blog-subtle);
   line-height: 1.6;
+  font-size: 15px;
 }
 
 .pagination-container {
   display: flex;
   justify-content: center;
-  margin-top: 30px;
+  margin-top: 40px;
+  padding: 16px;
+  border-radius: 100px; /* Pill shape for pagination */
 }
 
 @media (max-width: 640px) {
   .home-container {
-    padding: 26px 18px 42px;
+    padding: 0 16px;
+  }
+
+  .post-item {
+    padding: 24px 20px;
   }
 
   .article-title {
     font-size: 20px;
+  }
+
+  .page-heading h1 {
+    font-size: 28px;
   }
 }
 </style>

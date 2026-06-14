@@ -77,7 +77,7 @@ watch(() => route.hash, async (hash) => {
     </template>
 
     <template #article>
-      <PostArticle ref="articleRef" :article="article" />
+      <PostArticle ref="articleRef" :article="article" class="glass-panel" />
     </template>
   </PostLayout>
 </template>

@@ -1,8 +1,7 @@
-
 <script lang="js" setup>
-import { EditPen, Search, User } from '@element-plus/icons-vue'
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { useRouter,useRoute } from 'vue-router';
+import { EditPen, Search, User, Sunny, Moon } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, ref, watch, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { searchPosts } from '@/api/posts';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -16,6 +15,26 @@ const searchTouched = ref(false);
 let quickSearchTimer = null;
 let quickSearchRequestId = 0;
 
+// Theme logic
+const isDarkMode = ref(false);
+const toggleTheme = () => {
+  isDarkMode.value = !isDarkMode.value;
+  document.documentElement.setAttribute('data-theme', isDarkMode.value ? 'dark' : 'light');
+  localStorage.setItem('theme', isDarkMode.value ? 'dark' : 'light');
+};
+
+onMounted(() => {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    isDarkMode.value = savedTheme === 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  } else {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    isDarkMode.value = prefersDark;
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  }
+});
+
 const activeIndex = computed(() => {
   if (route.path.startsWith('/series')) return '2';
   if (route.path.startsWith('/categories')) return '3';
@@ -25,8 +44,6 @@ const activeIndex = computed(() => {
 });
 
 const isLegacyArticlePage = computed(() => route.path.startsWith('/p/'));
-
-const handleSelect = () => {};
 
 const goWrite = () => {
   router.push('/write');
@@ -142,63 +159,53 @@ onBeforeUnmount(clearQuickSearchTimer);
 </script>
 
 <template>
-  <div class="navbar">
-    <el-menu
-      :default-active="activeIndex"
-      class="el-menu-demo"
-      mode="horizontal"
-      @select="handleSelect"
-    >
-      <el-menu-item index="1">
-        <router-link to="/">首页</router-link>
-      </el-menu-item>
-      <el-menu-item index="2">
-        <router-link to="/series">系列</router-link>
-      </el-menu-item>
-      <el-menu-item index="3">
-        <router-link to="/categories">分类</router-link>
-      </el-menu-item>
-      <el-menu-item index="4">
-        <router-link to="/tags">标签</router-link>
-      </el-menu-item>
-      <el-menu-item index="5">
-        <router-link to="/about">信息</router-link>
-      </el-menu-item>
-    </el-menu>
+  <div class="header-wrapper">
+    <header class="glass-header">
+      <nav class="nav-links">
+        <router-link to="/" class="nav-item" :class="{ active: activeIndex === '1' }">首页</router-link>
+        <router-link to="/series" class="nav-item" :class="{ active: activeIndex === '2' }">系列</router-link>
+        <router-link to="/categories" class="nav-item" :class="{ active: activeIndex === '3' }">分类</router-link>
+        <router-link to="/tags" class="nav-item" :class="{ active: activeIndex === '4' }">标签</router-link>
+        <router-link to="/about" class="nav-item" :class="{ active: activeIndex === '5' }">信息</router-link>
+      </nav>
 
-<!-- 右侧功能区 -->
-    <div class="nav-right">
+      <!-- 右侧功能区 -->
+      <div class="nav-right">
+        <button type="button" class="glass-icon-btn" @click.prevent="toggleTheme" :title="isDarkMode ? '浅色模式' : '深色模式'">
+          <el-icon><Sunny v-if="!isDarkMode" /><Moon v-else /></el-icon>
+        </button>
 
-      <el-dropdown v-if="isLegacyArticlePage">
-        <el-button type="primary" :icon="EditPen">
-          编辑
-        </el-button>
-        
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item @click="goEdit">编辑文章</el-dropdown-item>
-            <el-dropdown-item @click="goWrite">新建文章</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
+        <button type="button" class="glass-icon-btn" @click.prevent="goSearch" title="搜索">
+          <el-icon><Search /></el-icon>
+        </button>
 
-      </el-dropdown>
+        <el-dropdown v-if="isLegacyArticlePage" trigger="click">
+          <button type="button" class="glass-icon-btn" title="编辑">
+            <el-icon><EditPen /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="goEdit">编辑文章</el-dropdown-item>
+              <el-dropdown-item @click="goWrite">新建文章</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
 
-      <el-button v-if="!isLegacyArticlePage" type="primary" :icon="EditPen" @click="goWrite">
-        写文章
-      </el-button>
-      <el-button type="primary" :icon="Search" @click="goSearch">
-        搜索
-      </el-button>
-      <el-button type="primary" :icon="User" @click="goLogin">
-        登录
-      </el-button>
-    </div>
+        <button v-if="!isLegacyArticlePage" type="button" class="glass-icon-btn" @click.prevent="goWrite" title="写文章">
+          <el-icon><EditPen /></el-icon>
+        </button>
+
+        <button type="button" class="glass-icon-btn" @click.prevent="goLogin" title="登录">
+          <el-icon><User /></el-icon>
+        </button>
+      </div>
+    </header>
 
     <el-dialog
       v-model="searchDialogVisible"
       title="搜索文章"
       width="560px"
-      class="search-dialog"
+      class="search-dialog glass-dialog"
       append-to-body
     >
       <form class="quick-search-form" @submit.prevent="runQuickSearch">
@@ -251,33 +258,93 @@ onBeforeUnmount(clearQuickSearchTimer);
 </template>
 
 <style lang="css" scoped>
-.navbar {
+.header-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  padding: 16px 20px;
+  pointer-events: none; /* Let clicks pass through empty spaces */
+}
+
+.glass-header {
+  pointer-events: auto; /* Re-enable clicks on the header itself */
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-right: 20px;
-  background-color: var(--blog-surface);
-  border-bottom: 1px solid var(--blog-border);
+  width: 100%;
+  max-width: 900px;
+  height: 56px;
+  padding: 0 8px 0 24px;
+  background: var(--blog-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--blog-border);
+  border-radius: 28px;
+  box-shadow: var(--glass-shadow);
+  transition: all 0.3s ease;
 }
 
-.el-menu-demo {
-  flex-grow: 1;
+.nav-links {
+  display: flex;
+  gap: 20px;
 }
 
-.el-menu-demo a {
-  color: inherit;
+.nav-item {
+  color: var(--blog-subtle);
   text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 16px;
+  transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+  color: var(--blog-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active {
+  color: var(--blog-text);
+  font-weight: 600;
 }
 
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.icon {
-  margin-right: 4px;
-  font-size: 16px;
+.glass-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--blog-subtle);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s ease;
+}
+
+.glass-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--blog-text);
+}
+
+[data-theme='dark'] .glass-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .quick-search-form {
@@ -303,21 +370,28 @@ onBeforeUnmount(clearQuickSearchTimer);
   gap: 4px;
   width: 100%;
   border: 1px solid var(--blog-border);
-  border-radius: 6px;
-  padding: 12px;
-  background: var(--blog-surface);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.02);
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+[data-theme='dark'] .quick-result-item {
+  background: rgba(255,255,255,0.02);
 }
 
 .quick-result-item:hover {
+  background: var(--blog-surface-hover);
   border-color: var(--blog-border-strong);
 }
 
 .quick-result-title {
   color: var(--blog-text);
   font-weight: 600;
+  font-size: 15px;
 }
 
 .quick-result-summary {
@@ -327,13 +401,24 @@ onBeforeUnmount(clearQuickSearchTimer);
 }
 
 @media (max-width: 640px) {
-  .navbar {
-    align-items: flex-start;
-    padding-right: 12px;
+  .glass-header {
+    padding: 0 4px 0 16px;
+    border-radius: 20px;
   }
-
-  .nav-right {
+  
+  .nav-links {
     gap: 8px;
+  }
+  
+  .nav-item {
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+  
+  .glass-icon-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
   }
 
   .quick-search-form {

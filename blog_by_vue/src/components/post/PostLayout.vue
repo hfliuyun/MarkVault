@@ -13,17 +13,19 @@ defineProps({
 
 <template>
   <div class="post-page-container">
-    <div v-if="loading" class="post-content-card">
+    <div v-if="loading" class="post-content-card glass-panel">
       <el-skeleton :rows="1" animated class="title-skeleton" />
       <el-skeleton :rows="10" animated />
     </div>
 
     <div v-else-if="article" class="post-layout">
       <slot name="sidebar" />
-      <slot name="article" />
+      <div class="post-content-wrapper">
+        <slot name="article" />
+      </div>
     </div>
 
-    <div v-else class="post-content-card">
+    <div v-else class="post-content-card glass-panel">
       <el-result icon="error" title="加载失败" sub-title="无法找到该文章，请检查链接或稍后再试。">
         <template #extra>
           <router-link to="/"><el-button type="primary">返回首页</el-button></router-link>
@@ -35,41 +37,45 @@ defineProps({
 
 <style>
 .post-page-container {
-  padding: 32px 24px 56px;
-  background-color: var(--blog-bg);
-  min-height: calc(100vh - 61px);
+  padding: 0 20px 40px;
+  max-width: 1400px; /* Widened for technical blogs */
+  margin: 0 auto;
 }
 
 .post-layout {
-  display: grid;
-  grid-template-columns: minmax(190px, 260px) minmax(0, 860px);
-  align-items: start;
+  display: flex;
   justify-content: center;
-  gap: 28px;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.post-content-wrapper {
+  flex: 1 1 auto;
+  max-width: 1100px; /* Allow it to grow significantly when sidebar collapses */
+  width: 100%;
+  transition: max-width 0.3s ease, flex 0.3s ease;
 }
 
 .post-content-card {
-  max-width: 860px;
   width: 100%;
   box-sizing: border-box;
-  margin: 0 auto;
-  padding: 0;
-  background-color: transparent;
+  padding: 48px 56px;
   text-align: left;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 960px) {
   .post-page-container {
-    padding: 18px;
+    padding: 0 12px 30px;
   }
 
   .post-layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
     gap: 16px;
   }
 
   .post-content-card {
-    padding: 0;
+    padding: 24px 20px;
   }
 }
 </style>

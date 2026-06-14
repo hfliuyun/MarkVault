@@ -45,79 +45,104 @@ watch(() => route.params.seriesId, fetchSeries);
     </el-result>
 
     <template v-else>
-      <header class="series-detail-header">
+      <header class="series-detail-header glass-panel">
         <router-link to="/series" class="back-link">返回系列</router-link>
         <h1>{{ series.title }}</h1>
         <p>{{ series.count }} 篇文章 · 更新于 {{ new Date(series.updated_at).toLocaleDateString() }}</p>
       </header>
 
-      <article v-for="post in series.posts" :key="post.slug" class="post-card">
-        <h2>
-          <router-link :to="{ name: 'PostDetail', params: { slug: post.slug } }">
-            {{ post.title }}
-          </router-link>
-        </h2>
-        <div class="post-meta">
-          <span>
-            <el-icon><Calendar /></el-icon>
-            {{ new Date(post.date).toLocaleDateString() }}
-          </span>
-          <span v-if="post.categories?.length">
-            <el-icon><CollectionTag /></el-icon>
-            {{ post.categories.join(' / ') }}
-          </span>
-        </div>
-        <p class="summary">{{ post.summary }}</p>
-      </article>
+      <div class="post-list">
+        <article v-for="post in series.posts" :key="post.slug" class="post-card glass-panel">
+          <h2>
+            <router-link :to="{ name: 'PostDetail', params: { slug: post.slug } }">
+              {{ post.title }}
+            </router-link>
+          </h2>
+          <div class="post-meta">
+            <span>
+              <el-icon><Calendar /></el-icon>
+              {{ new Date(post.date).toLocaleDateString() }}
+            </span>
+            <span v-if="post.categories?.length">
+              <el-icon><CollectionTag /></el-icon>
+              {{ post.categories.join(' / ') }}
+            </span>
+          </div>
+          <p class="summary">{{ post.summary }}</p>
+        </article>
+      </div>
     </template>
   </main>
 </template>
 
 <style scoped>
 .series-detail-page {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 36px 24px 56px;
+  padding: 0 20px;
   text-align: left;
 }
 
 .series-detail-header {
-  margin-bottom: 4px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--blog-border);
+  padding: 40px;
+  margin-bottom: 30px;
+  text-align: center;
 }
 
 .back-link {
   color: var(--blog-accent);
   font-size: 14px;
   text-decoration: none;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
 }
 
 .series-detail-header h1 {
-  margin: 10px 0 8px;
+  margin: 0 0 12px;
   color: var(--blog-text);
-  font-size: 30px;
+  font-size: 36px;
+  font-weight: 700;
   line-height: 1.25;
+  letter-spacing: -0.5px;
 }
 
 .series-detail-header p {
   margin: 0;
   color: var(--blog-muted);
+  font-size: 16px;
+}
+
+.post-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .post-card {
-  padding: 22px 0;
-  border-bottom: 1px solid var(--blog-border);
+  padding: 32px;
+  text-decoration: none;
+  display: block;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.post-card:hover {
+  transform: translateY(-4px);
 }
 
 .post-card h2 {
-  margin: 0 0 12px;
-  font-size: 22px;
+  margin: 0 0 14px;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .post-card h2 a {
   color: var(--blog-text);
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .post-card h2 a:hover {
@@ -139,9 +164,10 @@ watch(() => route.params.seriesId, fetchSeries);
 }
 
 .summary {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   color: var(--blog-subtle);
   line-height: 1.6;
+  font-size: 15px;
 }
 
 @media (max-width: 640px) {
