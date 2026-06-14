@@ -1,5 +1,7 @@
 <script setup>
-import PostToc from '@/components/post/PostToc.vue';
+import { computed, ref, watch } from 'vue';
+import { Menu } from '@element-plus/icons-vue';
+import PostSidebarContent from '@/components/post/PostSidebarContent.vue';
 
 const props = defineProps({
   article: {
@@ -17,48 +19,82 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:collapsed', 'toc-click']);
+const drawerVisible = ref(false);
+
+const hasSidebarContent = computed(() => (
+  Boolean(props.article.series_posts?.length) || Boolean(props.article.toc?.length)
+));
 
 const toggleSidebar = () => {
   emit('update:collapsed', !props.collapsed);
 };
+
+const closeDrawer = () => {
+  drawerVisible.value = false;
+};
+
+const handleTocClick = (headingId) => {
+  emit('toc-click', headingId);
+  closeDrawer();
+};
+
+watch(() => props.article.slug, closeDrawer);
 </script>
 
 <template>
-  <aside class="post-sidebar" :class="{ collapsed }">
-    <button class="sidebar-toggle" type="button" @click="toggleSidebar">
-      {{ collapsed ? '展开' : '收起' }}
-    </button>
-
-    <div v-if="!collapsed" class="sidebar-content">
-      <section v-if="article.series_posts?.length" class="sidebar-section">
-        <h2>{{ article.series?.title || '系列文章' }}</h2>
-        <ol class="series-list">
-          <li
-            v-for="item in article.series_posts"
-            :key="item.slug"
-            :class="{ active: item.slug === article.slug }"
-          >
-            <router-link :to="{ name: 'PostDetail', params: { slug: item.slug } }">
-              <span v-if="item.series?.order" class="series-order">{{ item.series.order }}</span>
-              {{ item.title }}
-            </router-link>
-          </li>
-        </ol>
-      </section>
-
-      <section v-if="article.toc?.length" class="sidebar-section">
-        <h2>目录</h2>
-        <PostToc
-          :toc="article.toc"
-          :active-heading-id="activeHeadingId"
-          @toc-click="(headingId) => emit('toc-click', headingId)"
-        />
-      </section>
+  <div class="post-sidebar-shell" :class="{ 'empty-mobile': !hasSidebarContent }">
+    <div v-if="hasSidebarContent" class="mobile-sidebar-trigger">
+      <button
+        class="mobile-sidebar-button"
+        type="button"
+        aria-label="打开文章导航"
+        @click="drawerVisible = true"
+      >
+        <el-icon><Menu /></el-icon>
+        <span>文章导航</span>
+      </button>
     </div>
-  </aside>
+
+    <aside class="post-sidebar" :class="{ collapsed }">
+      <button class="sidebar-toggle" type="button" @click="toggleSidebar">
+        {{ collapsed ? '展开' : '收起' }}
+      </button>
+
+      <PostSidebarContent
+        v-if="!collapsed"
+        :article="article"
+        :active-heading-id="activeHeadingId"
+        @toc-click="handleTocClick"
+      />
+    </aside>
+
+    <el-drawer
+      v-if="hasSidebarContent"
+      v-model="drawerVisible"
+      class="post-sidebar-drawer"
+      title="文章导航"
+      direction="ltr"
+      size="min(86vw, 360px)"
+    >
+      <PostSidebarContent
+        :article="article"
+        :active-heading-id="activeHeadingId"
+        @navigate="closeDrawer"
+        @toc-click="handleTocClick"
+      />
+    </el-drawer>
+  </div>
 </template>
 
 <style>
+.post-sidebar-shell {
+  min-width: 0;
+}
+
+.mobile-sidebar-trigger {
+  display: none;
+}
+
 .post-sidebar {
   position: sticky;
   top: 84px;
@@ -86,59 +122,49 @@ const toggleSidebar = () => {
   cursor: pointer;
 }
 
-.sidebar-section {
-  margin-top: 18px;
-}
-
-.sidebar-section h2 {
-  margin: 0 0 10px;
-  font-size: 15px;
-  color: var(--blog-text);
-}
-
-.series-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.series-list li {
-  margin-bottom: 6px;
-  color: var(--blog-subtle);
-}
-
-.series-list a {
-  display: flex;
-  gap: 8px;
-  padding: 5px 0;
-  line-height: 1.45;
-}
-
-.series-list li.active a {
-  color: var(--blog-accent);
-  font-weight: 600;
-}
-
-.series-order {
-  min-width: 18px;
-  color: var(--blog-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.series-list a {
-  color: inherit;
-  text-decoration: none;
-}
-
 @media (max-width: 860px) {
-  .post-sidebar {
-    position: static;
-    max-height: none;
+  .post-sidebar-shell {
     order: -1;
   }
 
-  .post-sidebar.collapsed {
-    width: auto;
+  .post-sidebar-shell.empty-mobile {
+    display: none;
+  }
+
+  .post-sidebar {
+    display: none;
+  }
+
+  .mobile-sidebar-trigger {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .mobile-sidebar-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--blog-border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    background: var(--blog-surface);
+    color: var(--blog-subtle);
+    cursor: pointer;
+  }
+
+  .mobile-sidebar-button:hover {
+    border-color: var(--blog-border-strong);
+    color: var(--blog-accent);
+  }
+
+  .post-sidebar-drawer .el-drawer__header {
+    margin-bottom: 0;
+    padding: 18px 18px 10px;
+    color: var(--blog-text);
+  }
+
+  .post-sidebar-drawer .el-drawer__body {
+    padding: 0 18px 22px;
   }
 }
 </style>

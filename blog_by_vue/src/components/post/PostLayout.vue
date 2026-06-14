@@ -65,6 +65,7 @@ defineProps({
 
   .post-layout {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .post-content-card {
