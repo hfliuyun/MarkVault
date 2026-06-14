@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -36,11 +37,13 @@ class ContentIndex:
         self.content_root = content_root
         self.posts_root = content_root / "posts"
         self.series_root = content_root / "series"
+        self.legacy_map_path = content_root / "legacy" / "abbrlink-map.json"
         self.posts_by_slug: dict[str, Post] = {}
         self.posts: list[Post] = []
         self.series_by_id: dict[str, dict[str, Any]] = {}
         self.categories: dict[str, list[Post]] = {}
         self.tags: dict[str, list[Post]] = {}
+        self.legacy_redirects: dict[str, str] = {}
         self.content_signature: tuple[tuple[str, int, int], ...] = ()
         self.reload()
 
@@ -52,6 +55,7 @@ class ContentIndex:
         self.series_by_id = self._build_series_index(posts)
         self.categories = self._build_taxonomy_index(posts, "categories")
         self.tags = self._build_taxonomy_index(posts, "tags")
+        self.legacy_redirects = self._build_legacy_redirects(posts)
         self.content_signature = content_signature
 
     def reload_if_changed(self) -> None:
@@ -143,6 +147,9 @@ class ContentIndex:
             "articles": articles,
         }
 
+    def resolve_legacy_abbrlink(self, abbrlink: str) -> str | None:
+        return self.legacy_redirects.get(str(abbrlink))
+
     def get_post_image_dir(self, slug: str) -> Path | None:
         post = self.posts_by_slug.get(slug)
         if not post:
@@ -174,7 +181,20 @@ class ContentIndex:
                     stat.st_size,
                 )
             )
+        legacy_map_signature = self._build_file_signature(self.legacy_map_path)
+        if legacy_map_signature:
+            signature.append(legacy_map_signature)
         return tuple(signature)
+
+    def _build_file_signature(self, file_path: Path) -> tuple[str, int, int] | None:
+        if not file_path.exists():
+            return None
+        stat = file_path.stat()
+        return (
+            file_path.relative_to(self.content_root).as_posix(),
+            stat.st_mtime_ns,
+            stat.st_size,
+        )
 
     def _iter_post_index_paths(self) -> list[Path]:
         paths = [
@@ -201,9 +221,12 @@ class ContentIndex:
         tags = self._normalize_list(metadata.pop("tags", []))
         series = metadata.pop("series", None)
         notion = metadata.pop("notion", None)
+        legacy = metadata.pop("legacy", None)
 
         if series is not None and not isinstance(series, dict):
             raise ContentIndexError(f"{index_path} field 'series' must be an object")
+        if legacy is not None and not isinstance(legacy, dict):
+            raise ContentIndexError(f"{index_path} field 'legacy' must be an object")
 
         return Post(
             title=title,
@@ -214,6 +237,7 @@ class ContentIndex:
             tags=tags,
             series=series,
             notion=notion,
+            legacy=legacy,
             source_path=index_path,
             body=parsed.content,
             extra=metadata,
@@ -246,6 +270,58 @@ class ContentIndex:
             )
 
         return grouped
+
+    def _build_legacy_redirects(self, posts: list[Post]) -> dict[str, str]:
+        redirects: dict[str, str] = {}
+        for post in posts:
+            for abbrlink in self._legacy_abbrlinks(post):
+                self._add_legacy_redirect(redirects, abbrlink, post.slug, post.source_path)
+
+        file_redirects = self._load_legacy_map_file()
+        for abbrlink, slug in file_redirects.items():
+            if slug not in self.posts_by_slug:
+                raise ContentIndexError(
+                    f"{self.legacy_map_path} maps abbrlink '{abbrlink}' "
+                    f"to unknown slug '{slug}'"
+                )
+            self._add_legacy_redirect(redirects, abbrlink, slug, self.legacy_map_path)
+
+        return redirects
+
+    def _legacy_abbrlinks(self, post: Post) -> list[str]:
+        if not post.legacy:
+            return []
+        return self._normalize_list(post.legacy.get("abbrlinks"))
+
+    def _load_legacy_map_file(self) -> dict[str, str]:
+        if not self.legacy_map_path.exists():
+            return {}
+        try:
+            data = json.loads(self.legacy_map_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise ContentIndexError(
+                f"{self.legacy_map_path} has invalid JSON: {error}"
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ContentIndexError(f"{self.legacy_map_path} must contain a JSON object")
+
+        return {str(abbrlink): str(slug) for abbrlink, slug in data.items()}
+
+    def _add_legacy_redirect(
+        self,
+        redirects: dict[str, str],
+        abbrlink: str,
+        slug: str,
+        source_path: Path,
+    ) -> None:
+        existing_slug = redirects.get(abbrlink)
+        if existing_slug and existing_slug != slug:
+            raise ContentIndexError(
+                f"Legacy abbrlink '{abbrlink}' maps to both "
+                f"'{existing_slug}' and '{slug}' in {source_path}"
+            )
+        redirects[abbrlink] = slug
 
     def _build_taxonomy_index(
         self, posts: list[Post], field_name: str

@@ -3,7 +3,7 @@ import { ref, onMounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import renderMathInElement from 'katex/dist/contrib/auto-render';
 import hljs from 'highlight.js';
-import { getLegacyPost, getPost } from '@/api/posts';
+import { getPost } from '@/api/posts';
 
 import 'highlight.js/styles/atom-one-dark.css';
 import 'katex/dist/katex.min.css';
@@ -123,9 +123,7 @@ const fetchArticle = async () => {
   article.value = null;
 
   try {
-    article.value = route.params.slug
-      ? await getPost(route.params.slug)
-      : await getLegacyPost(route.params.abbrlink);
+    article.value = await getPost(route.params.slug);
   } catch (error) {
     console.error('获取文章详情失败:', error);
   } finally {
@@ -143,7 +141,7 @@ const fetchArticle = async () => {
 };
 
 onMounted(fetchArticle);
-watch(() => [route.params.slug, route.params.abbrlink], fetchArticle);
+watch(() => route.params.slug, fetchArticle);
 
 watch(() => route.hash, async (hash) => {
   const headingId = decodeRouteHash(hash);

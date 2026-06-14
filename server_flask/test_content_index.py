@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -248,6 +249,136 @@ tags:
         self.assertEqual(data["query"], "visible")
         self.assertEqual(data["total"], 1)
         self.assertEqual(data["articles"][0]["slug"], "hotload")
+
+    def test_legacy_abbrlink_map_can_be_read_from_post_frontmatter(self):
+        self.write_post(
+            "posts/git-basic",
+            "Git Basic",
+            "git-basic",
+            "2024-01-01",
+            extra_frontmatter="""legacy:
+  abbrlinks:
+    - ab9e1965
+""",
+        )
+
+        index = ContentIndex(self.content_root)
+
+        self.assertEqual(index.resolve_legacy_abbrlink("ab9e1965"), "git-basic")
+
+    def test_legacy_abbrlink_map_can_be_read_from_json_file(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        legacy_dir = self.content_root / "legacy"
+        legacy_dir.mkdir()
+        (legacy_dir / "abbrlink-map.json").write_text(
+            json.dumps({"ab9e1965": "git-basic"}),
+            encoding="utf-8",
+        )
+
+        index = ContentIndex(self.content_root)
+
+        self.assertEqual(index.resolve_legacy_abbrlink("ab9e1965"), "git-basic")
+
+    def test_legacy_map_rejects_unknown_slug(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        legacy_dir = self.content_root / "legacy"
+        legacy_dir.mkdir()
+        (legacy_dir / "abbrlink-map.json").write_text(
+            json.dumps({"ab9e1965": "missing-post"}),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ContentIndexError, "unknown slug 'missing-post'"):
+            ContentIndex(self.content_root)
+
+    def test_legacy_map_rejects_conflicting_abbrlink(self):
+        self.write_post(
+            "posts/git-basic",
+            "Git Basic",
+            "git-basic",
+            "2024-01-01",
+            extra_frontmatter="""legacy:
+  abbrlinks:
+    - same-link
+""",
+        )
+        self.write_post(
+            "posts/linux-swap",
+            "Linux Swap",
+            "linux-swap",
+            "2024-01-02",
+            extra_frontmatter="""legacy:
+  abbrlinks:
+    - same-link
+""",
+        )
+
+        with self.assertRaisesRegex(ContentIndexError, "same-link"):
+            ContentIndex(self.content_root)
+
+    def test_legacy_route_redirects_mapped_abbrlink(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        legacy_dir = self.content_root / "legacy"
+        legacy_dir.mkdir()
+        (legacy_dir / "abbrlink-map.json").write_text(
+            json.dumps({"ab9e1965": "git-basic"}),
+            encoding="utf-8",
+        )
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                response = client.get("/api/p/ab9e1965")
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(response.status_code, 308)
+        self.assertEqual(response.headers["Location"], "/api/posts/git-basic")
+
+    def test_legacy_route_returns_clear_404_for_unmapped_abbrlink(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                response = client.get("/api/p/missing-link")
+                data = response.get_json()
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(data["error"], "Legacy post not migrated")
+
+    def test_legacy_map_file_changes_reload_on_next_request(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        legacy_dir = self.content_root / "legacy"
+        legacy_dir.mkdir()
+        map_path = legacy_dir / "abbrlink-map.json"
+        map_path.write_text(json.dumps({}), encoding="utf-8")
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                initial_response = client.get("/api/p/ab9e1965")
+                self.assertEqual(initial_response.status_code, 404)
+
+                map_path.write_text(
+                    json.dumps({"ab9e1965": "git-basic"}),
+                    encoding="utf-8",
+                )
+
+                response = client.get("/api/p/ab9e1965")
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(response.status_code, 308)
+        self.assertEqual(response.headers["Location"], "/api/posts/git-basic")
 
 
 if __name__ == "__main__":

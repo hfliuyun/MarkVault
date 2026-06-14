@@ -174,10 +174,46 @@ The backend rewrites those paths when rendering post detail HTML.
 
 ## Legacy Routes
 
-These routes remain available for compatibility but should not be used by new frontend code:
+These routes remain available for compatibility but should not be used by new frontend code.
+
+`GET /api/p/:abbrlink` now resolves migrated legacy links through explicit mappings:
+
+- `legacy.abbrlinks` in post frontmatter
+- `content/legacy/abbrlink-map.json`
+
+When a mapping exists, the route returns a permanent redirect:
+
+```text
+308 Location: /api/posts/:slug
+```
+
+When a legacy link has not been migrated, the response is:
+
+```json
+{
+  "error": "Legacy post not migrated"
+}
+```
+
+Example `content/legacy/abbrlink-map.json`:
+
+```json
+{
+  "f9b01ad8": "logistic-regression"
+}
+```
+
+Frontmatter mapping example:
+
+```yaml
+legacy:
+  abbrlinks:
+    - f9b01ad8
+```
+
+Other legacy routes:
 
 - `GET /api/posts_list_metadata`
-- `GET /api/p/:abbrlink`
 - `GET /api/md/:abbrlink`
 - `POST /api/upload_image`
 - `POST /api/save_post`

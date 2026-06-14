@@ -2,11 +2,10 @@
 import os
 import frontmatter
 import markdown
-from flask import current_app, jsonify, request
+from flask import current_app, jsonify, redirect, request, url_for
 from . import api_bp
 from app.services.content_index import ContentIndex, ContentIndexError
 from app.services.media import send_post_image
-from utils.renderMarkdown import render_markdown_to_html
 from utils.saveUtils import save_image, save_post
 
 
@@ -186,15 +185,14 @@ def get_post_media(slug, filename):
 
 @api_bp.route('/p/<string:abbrlink>', methods=['GET'])
 def get_post_by_abbrlink_route(abbrlink):
-    raw_content = get_raw_post_by_abbrlink(abbrlink)
-    if raw_content is not None:
-        post_frontmatter = frontmatter.loads(raw_content)
-        response = dict(post_frontmatter.metadata)
-        #print(response)
-        response['content'] = render_markdown_to_html(post_frontmatter.content)
-        return jsonify(response)
-    else:
-        return jsonify({'error': 'Post not found'}), 404
+    try:
+        slug = get_content_index().resolve_legacy_abbrlink(abbrlink)
+    except ContentIndexError as error:
+        return content_error_response(error)
+
+    if not slug:
+        return jsonify({'error': 'Legacy post not migrated'}), 404
+    return redirect(url_for('api.get_post', slug=slug), code=308)
 
 @api_bp.route('/md/<string:abbrlink>', methods=['GET'])
 def get_mdpost_by_abbrlink_route(abbrlink):

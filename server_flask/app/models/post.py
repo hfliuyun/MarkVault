@@ -16,6 +16,7 @@ class Post:
     body: str
     series: dict[str, Any] | None = None
     notion: dict[str, Any] | None = None
+    legacy: dict[str, Any] | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property

@@ -19,7 +19,7 @@ const routes = [
   {
     path: "/p/:abbrlink",
     name: "LegacyPostDetail",
-    component: () => import("@/views/Post.vue"),
+    component: () => import("@/views/LegacyRedirect.vue"),
   },
   {
     path: "/series",

@@ -126,6 +126,26 @@ Series rules:
 - Series detail pages sort by `series.order`.
 - Posts without `series.order` are placed after ordered posts.
 
+## Legacy Links
+
+Old `/p/:abbrlink` links are redirected only through explicit mappings. Prefer adding migrated links to the new post frontmatter:
+
+```yaml
+legacy:
+  abbrlinks:
+    - f9b01ad8
+```
+
+For batch mappings, create `content/legacy/abbrlink-map.json`:
+
+```json
+{
+  "f9b01ad8": "logistic-regression"
+}
+```
+
+The JSON value must be the new post `slug`. Do not generate new long-term links with Python `hash(title)`.
+
 ## Images
 
 Put images in the post folder:

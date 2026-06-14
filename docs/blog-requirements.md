@@ -23,6 +23,7 @@
 - 已实现写文章模板生成器：`python3 manage.py new_post "标题" --slug example-slug` 会生成 `content/posts/<slug>/index.md` 和 `images/`，支持 `BLOG_CONTENT_ROOT`，并拒绝覆盖已有 slug。
 - 已实现分类和标签页面：新增 `/categories`、`/categories/:category`、`/tags`、`/tags/:tag`，首页和文章详情页的分类、标签均可跳转到对应聚合页。
 - 已实现搜索功能：新增 `GET /api/search?q=keyword`，前端提供顶部搜索弹窗和 `/search?q=keyword` 搜索结果页。
+- 已实现旧链接兼容跳转：`/p/:abbrlink` 通过 `legacy.abbrlinks` 或 `content/legacy/abbrlink-map.json` 显式映射跳转到 `/posts/:slug`，未迁移链接返回明确提示。
 
 ### 0.2 待实现需求清单
 
@@ -61,6 +62,8 @@
   - 空关键词返回空结果或明确提示，不返回 500。
 
 #### 0.2.4 旧链接兼容跳转
+
+状态：已完成。
 
 - 目标：让旧 `/p/:abbrlink` 链接尽量跳转到新 `/posts/:slug`。
 - 范围：建立旧 `abbrlink` 到新 `slug` 的映射策略，可从已迁移文章 metadata 或映射文件读取。
@@ -127,13 +130,12 @@
 
 后续建议按以下顺序推进，每次只实现一个需求点：
 
-1. 旧链接兼容跳转。
-2. 文章详情组件拆分。
-3. 移动端文章侧边栏优化。
-4. Markdown HTML 安全清洗。
-5. 本地图片写作和上传链路。
-6. 测试补强。
-7. Notion 单向同步。
+1. 文章详情组件拆分。
+2. 移动端文章侧边栏优化。
+3. Markdown HTML 安全清洗。
+4. 本地图片写作和上传链路。
+5. 测试补强。
+6. Notion 单向同步。
 
 ## 1. 核心目标
 
