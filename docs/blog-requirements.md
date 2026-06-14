@@ -24,6 +24,7 @@
 - 已实现分类和标签页面：新增 `/categories`、`/categories/:category`、`/tags`、`/tags/:tag`，首页和文章详情页的分类、标签均可跳转到对应聚合页。
 - 已实现搜索功能：新增 `GET /api/search?q=keyword`，前端提供顶部搜索弹窗和 `/search?q=keyword` 搜索结果页。
 - 已实现旧链接兼容跳转：`/p/:abbrlink` 通过 `legacy.abbrlinks` 或 `content/legacy/abbrlink-map.json` 显式映射跳转到 `/posts/:slug`，未迁移链接返回明确提示。
+- 已完成文章详情页组件拆分：`Post.vue` 只保留页面级数据加载、路由监听和组件组合逻辑，布局、正文、元信息、侧边栏、TOC、Markdown 增强和标题跳转逻辑已拆出。
 
 ### 0.2 待实现需求清单
 
@@ -73,6 +74,8 @@
   - 不再使用 Python `hash(title)` 作为长期链接依据。
 
 #### 0.2.5 文章详情组件拆分
+
+状态：已完成。
 
 - 目标：降低 `Post.vue` 复杂度，便于后续维护。
 - 范围：拆出文章布局、系列侧边栏、TOC、metadata、正文增强逻辑等组件或 composable。
@@ -130,12 +133,11 @@
 
 后续建议按以下顺序推进，每次只实现一个需求点：
 
-1. 文章详情组件拆分。
-2. 移动端文章侧边栏优化。
-3. Markdown HTML 安全清洗。
-4. 本地图片写作和上传链路。
-5. 测试补强。
-6. Notion 单向同步。
+1. 移动端文章侧边栏优化。
+2. Markdown HTML 安全清洗。
+3. 本地图片写作和上传链路。
+4. 测试补强。
+5. Notion 单向同步。
 
 ## 1. 核心目标
 
