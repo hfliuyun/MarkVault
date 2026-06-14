@@ -32,6 +32,26 @@ const routes = [
     component: () => import("@/views/SeriesDetail.vue"),
   },
   {
+    path: "/categories",
+    name: "CategoryList",
+    component: () => import("@/views/CategoryList.vue"),
+  },
+  {
+    path: "/categories/:category",
+    name: "CategoryDetail",
+    component: () => import("@/views/CategoryDetail.vue"),
+  },
+  {
+    path: "/tags",
+    name: "TagList",
+    component: () => import("@/views/TagList.vue"),
+  },
+  {
+    path: "/tags/:tag",
+    name: "TagDetail",
+    component: () => import("@/views/TagDetail.vue"),
+  },
+  {
     path:"/write",
     name:"Write",
     component:()=>import("@/views/Edit.vue")

@@ -206,8 +206,28 @@ watch(() => route.hash, async (hash) => {
         <h1 class="post-title">{{ article.title }}</h1>
         <div class="post-meta">
           <span v-if="article.date">发布于 {{ formatDate(article.date) }}</span>
-          <span v-if="article.categories?.length">分类: {{ article.categories.join(' / ') }}</span>
-          <span v-if="article.tags?.length">标签: {{ article.tags.join(' / ') }}</span>
+          <span v-if="article.categories?.length" class="post-meta-group">
+            分类:
+            <router-link
+              v-for="category in article.categories"
+              :key="category"
+              :to="{ name: 'CategoryDetail', params: { category } }"
+              class="post-meta-link category-link"
+            >
+              {{ category }}
+            </router-link>
+          </span>
+          <span v-if="article.tags?.length" class="post-meta-group">
+            标签:
+            <router-link
+              v-for="tag in article.tags"
+              :key="tag"
+              :to="{ name: 'TagDetail', params: { tag } }"
+              class="post-meta-link tag-link"
+            >
+              {{ tag }}
+            </router-link>
+          </span>
         </div>
 
         <div ref="markdownContainer" class="markdown-body" v-html="article.content"></div>
@@ -374,6 +394,35 @@ watch(() => route.hash, async (hash) => {
 
 .post-meta span {
   margin-right: 0;
+}
+
+.post-meta-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+}
+
+.post-meta-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.post-meta-link:hover {
+  color: var(--blog-accent);
+}
+
+.post-meta-link.category-link:not(:last-child)::after {
+  content: "/";
+  padding-left: 7px;
+  color: var(--blog-muted);
+}
+
+.post-meta-link.tag-link {
+  padding: 0 7px;
+  border: 1px solid var(--blog-border);
+  border-radius: 4px;
+  background: var(--blog-surface);
+  font-size: 12px;
 }
 
 .markdown-body {

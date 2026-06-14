@@ -67,10 +67,27 @@ onMounted(() => {
           </span>
           <span class="post-meta-item">
             <el-icon><CollectionTag /></el-icon>
-            <span class="category-link">{{ article.categories?.join?.(' / ') || '未分类' }}</span>
+            <span v-if="article.categories?.length" class="category-list">
+              <router-link
+                v-for="category in article.categories"
+                :key="category"
+                :to="{ name: 'CategoryDetail', params: { category } }"
+                class="category-link"
+              >
+                {{ category }}
+              </router-link>
+            </span>
+            <span v-else>未分类</span>
           </span>
           <span v-if="article.tags?.length" class="post-meta-item tags">
-            <el-tag v-for="tag in article.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+            <router-link
+              v-for="tag in article.tags"
+              :key="tag"
+              :to="{ name: 'TagDetail', params: { tag } }"
+              class="tag-link"
+            >
+              <el-tag size="small" effect="plain">{{ tag }}</el-tag>
+            </router-link>
           </span>
         </div>
         <p class="summary">
@@ -170,6 +187,29 @@ onMounted(() => {
 }
 
 .category-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.category-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+}
+
+.category-link:not(:last-child)::after {
+  content: "/";
+  padding-left: 7px;
+  color: var(--blog-muted);
+}
+
+.category-link:hover,
+.tag-link:hover {
+  color: var(--blog-accent);
+}
+
+.tag-link {
+  display: inline-flex;
   color: inherit;
   text-decoration: none;
 }

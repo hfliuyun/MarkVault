@@ -9,7 +9,9 @@ const route = useRoute();
 
 const activeIndex = computed(() => {
   if (route.path.startsWith('/series')) return '2';
-  if (route.path.startsWith('/about')) return '3';
+  if (route.path.startsWith('/categories')) return '3';
+  if (route.path.startsWith('/tags')) return '4';
+  if (route.path.startsWith('/about')) return '5';
   return '1';
 });
 
@@ -50,6 +52,12 @@ const goEdit = () => {
         <router-link to="/series">系列</router-link>
       </el-menu-item>
       <el-menu-item index="3">
+        <router-link to="/categories">分类</router-link>
+      </el-menu-item>
+      <el-menu-item index="4">
+        <router-link to="/tags">标签</router-link>
+      </el-menu-item>
+      <el-menu-item index="5">
         <router-link to="/about">信息</router-link>
       </el-menu-item>
     </el-menu>
