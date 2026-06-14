@@ -1,6 +1,8 @@
-# MarkNest
+# MarkVault
 
-MarkNest is a Markdown-first personal blog system. It keeps article content in a
+[简体中文](README.zh-CN.md)
+
+MarkVault is a Markdown-first personal blog system. It keeps article content in a
 plain file tree, serves it through a Flask API, and renders the public site with
 a Vue 3 frontend.
 
@@ -59,8 +61,8 @@ content/
 Clone the code repository:
 
 ```sh
-git clone <repo-url> marknest
-cd marknest
+git clone <repo-url> markvault
+cd markvault
 ```
 
 Prepare a content directory. You can either create a local `content/` directory,
@@ -156,4 +158,4 @@ npm run build
 
 ## License
 
-MarkNest is released under the MIT License. See `LICENSE` for details.
+MarkVault is released under the MIT License. See `LICENSE` for details.
