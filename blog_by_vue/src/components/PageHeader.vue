@@ -17,6 +17,19 @@ let quickSearchRequestId = 0;
 
 // Theme logic
 const isDarkMode = ref(false);
+const isHidden = ref(false);
+let lastScrollY = 0;
+
+const handleScroll = () => {
+  const currentScrollY = window.scrollY || document.documentElement.scrollTop;
+  if (currentScrollY > lastScrollY && currentScrollY > 60) {
+    isHidden.value = true;
+  } else if (currentScrollY < lastScrollY) {
+    isHidden.value = false;
+  }
+  lastScrollY = currentScrollY <= 0 ? 0 : currentScrollY;
+};
+
 const toggleTheme = () => {
   isDarkMode.value = !isDarkMode.value;
   document.documentElement.setAttribute('data-theme', isDarkMode.value ? 'dark' : 'light');
@@ -24,6 +37,7 @@ const toggleTheme = () => {
 };
 
 onMounted(() => {
+  window.addEventListener('scroll', handleScroll, { passive: true });
   const savedTheme = localStorage.getItem('theme');
   if (savedTheme) {
     isDarkMode.value = savedTheme === 'dark';
@@ -155,11 +169,14 @@ watch(searchDialogVisible, (visible) => {
   searchLoading.value = false;
 });
 
-onBeforeUnmount(clearQuickSearchTimer);
+onBeforeUnmount(() => {
+  clearQuickSearchTimer();
+  window.removeEventListener('scroll', handleScroll);
+});
 </script>
 
 <template>
-  <div class="header-wrapper">
+  <div class="header-wrapper" :class="{ 'is-hidden': isHidden }">
     <header class="glass-header">
       <nav class="nav-links">
         <router-link to="/" class="nav-item" :class="{ active: activeIndex === '1' }">首页</router-link>
@@ -268,6 +285,11 @@ onBeforeUnmount(clearQuickSearchTimer);
   justify-content: center;
   padding: 16px 20px;
   pointer-events: none; /* Let clicks pass through empty spaces */
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-wrapper.is-hidden {
+  transform: translateY(-100%);
 }
 
 .glass-header {
