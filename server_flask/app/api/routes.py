@@ -167,6 +167,15 @@ def get_tags():
         return content_error_response(error)
 
 
+@api_bp.route('/search', methods=['GET'])
+def search_posts():
+    query = request.args.get('q', '')
+    try:
+        return jsonify(get_content_index().search_posts(query))
+    except ContentIndexError as error:
+        return content_error_response(error)
+
+
 @api_bp.route('/media/posts/<slug>/images/<path:filename>', methods=['GET'])
 def get_post_media(slug, filename):
     try:

@@ -123,6 +123,39 @@ Error responses:
 - `404`: series not found
 - `500`: content index error
 
+## `GET /api/search`
+
+Searches posts by title, summary, Markdown body, categories, and tags.
+
+Query parameters:
+
+- `q`: search keyword
+
+Empty keywords return an empty result instead of an error.
+
+Example response:
+
+```json
+{
+  "query": "逻辑回归",
+  "total": 1,
+  "articles": [
+    {
+      "title": "逻辑回归",
+      "slug": "logistic-regression",
+      "date": "2022-01-29 14:40:13",
+      "summary": "逻辑回归的基本原理、损失函数和梯度推导。",
+      "categories": ["机器学习"],
+      "tags": ["算法", "逻辑回归", "监督学习"]
+    }
+  ]
+}
+```
+
+Error responses:
+
+- `500`: content index error
+
 ## Media
 
 Post-local images are served through:

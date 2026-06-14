@@ -16,3 +16,10 @@ export async function getLegacyPost(abbrlink) {
   const response = await axios.get(`/api/p/${encodeURIComponent(abbrlink)}`);
   return response.data;
 }
+
+export async function searchPosts(query) {
+  const response = await axios.get('/api/search', {
+    params: { q: query },
+  });
+  return response.data;
+}

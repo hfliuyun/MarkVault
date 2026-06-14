@@ -15,19 +15,31 @@ class ContentIndexTestCase(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def write_post(self, relative_dir, title, slug, date, body="", extra_frontmatter=""):
+    def write_post(
+        self,
+        relative_dir,
+        title,
+        slug,
+        date,
+        body="",
+        extra_frontmatter="",
+        categories=None,
+        tags=None,
+    ):
         post_dir = self.content_root / relative_dir
         post_dir.mkdir(parents=True, exist_ok=True)
         (post_dir / "images").mkdir(exist_ok=True)
+        category_lines = "\n".join(f"  - {category}" for category in (categories or ["Notes"]))
+        tag_lines = "\n".join(f"  - {tag}" for tag in (tags or ["Test"]))
         frontmatter = f"""---
 title: {title}
 slug: {slug}
 date: {date}
 summary: {title} summary
 categories:
-  - Notes
+{category_lines}
 tags:
-  - Test
+{tag_lines}
 {extra_frontmatter}---
 """
         (post_dir / "index.md").write_text(frontmatter + body, encoding="utf-8")
@@ -143,6 +155,99 @@ tags:
 
         self.assertNotEqual(index.content_signature, original_signature)
         self.assertIn("logistic-regression", index.posts_by_slug)
+
+    def test_search_matches_title_summary_body_categories_and_tags(self):
+        self.write_post(
+            "posts/title-hit",
+            "Neural Search",
+            "title-hit",
+            "2024-01-01",
+        )
+        self.write_post(
+            "posts/summary-hit",
+            "alpha summary match",
+            "summary-hit",
+            "2024-01-02",
+        )
+        self.write_post(
+            "posts/body-hit",
+            "Body Hit",
+            "body-hit",
+            "2024-01-03",
+            body="The body contains VECTOR search notes.",
+        )
+        self.write_post(
+            "posts/category-hit",
+            "Category Hit",
+            "category-hit",
+            "2024-01-04",
+            categories=["SearchCategory"],
+        )
+        self.write_post(
+            "posts/tag-hit",
+            "Tag Hit",
+            "tag-hit",
+            "2024-01-05",
+            tags=["SearchTag"],
+        )
+
+        index = ContentIndex(self.content_root)
+
+        self.assertEqual(
+            [post["slug"] for post in index.search_posts("neural")["articles"]],
+            ["title-hit"],
+        )
+        self.assertEqual(
+            [post["slug"] for post in index.search_posts("alpha summary")["articles"]],
+            ["summary-hit"],
+        )
+        self.assertEqual(
+            [post["slug"] for post in index.search_posts("vector")["articles"]],
+            ["body-hit"],
+        )
+        self.assertEqual(
+            [post["slug"] for post in index.search_posts("searchcategory")["articles"]],
+            ["category-hit"],
+        )
+        self.assertEqual(
+            [post["slug"] for post in index.search_posts("searchtag")["articles"]],
+            ["tag-hit"],
+        )
+
+    def test_search_empty_query_returns_empty_result(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        index = ContentIndex(self.content_root)
+
+        self.assertEqual(index.search_posts("   "), {"query": "", "total": 0, "articles": []})
+
+    def test_search_route_returns_results_and_reload_if_changed(self):
+        self.write_post("posts/git-basic", "Git Basic", "git-basic", "2024-01-01")
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                initial_response = client.get("/api/search?q=hotload")
+                self.assertEqual(initial_response.get_json()["total"], 0)
+
+                self.write_post(
+                    "posts/hotload",
+                    "Hotload Search",
+                    "hotload",
+                    "2024-01-02",
+                    body="Visible on the next search request.",
+                )
+
+                response = client.get("/api/search?q=visible")
+                data = response.get_json()
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["query"], "visible")
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(data["articles"][0]["slug"], "hotload")
 
 
 if __name__ == "__main__":

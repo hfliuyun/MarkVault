@@ -22,6 +22,7 @@
 - 已添加标准 commit message 模板 `.gitmessage`，当前仓库本地已配置 `git config commit.template .gitmessage`。
 - 已实现写文章模板生成器：`python3 manage.py new_post "标题" --slug example-slug` 会生成 `content/posts/<slug>/index.md` 和 `images/`，支持 `BLOG_CONTENT_ROOT`，并拒绝覆盖已有 slug。
 - 已实现分类和标签页面：新增 `/categories`、`/categories/:category`、`/tags`、`/tags/:tag`，首页和文章详情页的分类、标签均可跳转到对应聚合页。
+- 已实现搜索功能：新增 `GET /api/search?q=keyword`，前端提供顶部搜索弹窗和 `/search?q=keyword` 搜索结果页。
 
 ### 0.2 待实现需求清单
 
@@ -49,6 +50,8 @@
   - 首页和文章详情页中的分类、标签可以跳转到对应页面。
 
 #### 0.2.3 搜索功能
+
+状态：已完成。
 
 - 目标：支持按关键词搜索博客文章。
 - 范围：新增 `GET /api/search?q=keyword`，前端导航搜索入口接入该接口。
@@ -124,14 +127,13 @@
 
 后续建议按以下顺序推进，每次只实现一个需求点：
 
-1. 搜索功能。
-2. 旧链接兼容跳转。
-3. 文章详情组件拆分。
-4. 移动端文章侧边栏优化。
-5. Markdown HTML 安全清洗。
-6. 本地图片写作和上传链路。
-7. 测试补强。
-8. Notion 单向同步。
+1. 旧链接兼容跳转。
+2. 文章详情组件拆分。
+3. 移动端文章侧边栏优化。
+4. Markdown HTML 安全清洗。
+5. 本地图片写作和上传链路。
+6. 测试补强。
+7. Notion 单向同步。
 
 ## 1. 核心目标
 

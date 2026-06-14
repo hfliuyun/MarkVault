@@ -126,6 +126,23 @@ class ContentIndex:
     def list_tags(self) -> dict[str, Any]:
         return {"tags": self._serialize_taxonomy(self.tags)}
 
+    def search_posts(self, query: str) -> dict[str, Any]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            return {"query": "", "total": 0, "articles": []}
+
+        lowered_query = normalized_query.casefold()
+        articles = [
+            post.to_metadata_dict()
+            for post in self.posts
+            if lowered_query in self._search_text(post)
+        ]
+        return {
+            "query": normalized_query,
+            "total": len(articles),
+            "articles": articles,
+        }
+
     def get_post_image_dir(self, slug: str) -> Path | None:
         post = self.posts_by_slug.get(slug)
         if not post:
@@ -248,6 +265,17 @@ class ContentIndex:
             }
             for name, posts in sorted(taxonomy.items(), key=lambda item: item[0])
         ]
+
+    def _search_text(self, post: Post) -> str:
+        return "\n".join(
+            [
+                post.title,
+                post.summary,
+                post.body,
+                *post.categories,
+                *post.tags,
+            ]
+        ).casefold()
 
     def _parse_date(self, value: Any, path: Path) -> datetime:
         if isinstance(value, datetime):

@@ -1,11 +1,17 @@
 
 <script lang="js" setup>
 import { EditPen, Search, User } from '@element-plus/icons-vue'
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter,useRoute } from 'vue-router';
+import { searchPosts } from '@/api/posts';
 
 const router = useRouter();
 const route = useRoute();
+const searchDialogVisible = ref(false);
+const searchInput = ref('');
+const searchResults = ref([]);
+const searchLoading = ref(false);
+const searchTouched = ref(false);
 
 const activeIndex = computed(() => {
   if (route.path.startsWith('/series')) return '2';
@@ -23,7 +29,13 @@ const goWrite = () => {
   router.push('/write');
 };
 
-const goSearch = () => {};
+const goSearch = () => {
+  const query = route.query.q;
+  if (route.name === 'Search') {
+    searchInput.value = Array.isArray(query) ? query[0] || '' : query || '';
+  }
+  searchDialogVisible.value = true;
+};
 const goLogin = () => {};
 
 const goEdit = () => {
@@ -34,6 +46,40 @@ const goEdit = () => {
   }
   router.push(`/write?edit=${abbrlink}`);
 }
+
+const runQuickSearch = async () => {
+  const keyword = searchInput.value.trim();
+  searchTouched.value = true;
+  if (!keyword) {
+    searchResults.value = [];
+    return;
+  }
+
+  searchLoading.value = true;
+  try {
+    const data = await searchPosts(keyword);
+    searchResults.value = (data.articles || []).slice(0, 5);
+  } catch (error) {
+    console.error('搜索文章失败:', error);
+    searchResults.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+};
+
+const goSearchPage = () => {
+  const keyword = searchInput.value.trim();
+  searchDialogVisible.value = false;
+  router.push({
+    name: 'Search',
+    query: keyword ? { q: keyword } : {},
+  });
+};
+
+const goPost = (slug) => {
+  searchDialogVisible.value = false;
+  router.push({ name: 'PostDetail', params: { slug } });
+};
 
 </script>
 
@@ -90,9 +136,60 @@ const goEdit = () => {
       </el-button>
     </div>
 
+    <el-dialog
+      v-model="searchDialogVisible"
+      title="搜索文章"
+      width="560px"
+      class="search-dialog"
+      append-to-body
+    >
+      <form class="quick-search-form" @submit.prevent="runQuickSearch">
+        <el-input
+          v-model="searchInput"
+          clearable
+          autofocus
+          placeholder="输入关键词"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" native-type="submit" :loading="searchLoading">
+          搜索
+        </el-button>
+      </form>
 
+      <div v-if="searchLoading" class="quick-search-state">
+        <el-skeleton :rows="3" animated />
+      </div>
 
-</div>
+      <div v-else-if="!searchInput.trim()" class="quick-search-state">
+        输入关键词搜索文章标题、摘要、正文、分类和标签。
+      </div>
+
+      <div v-else-if="searchTouched && !searchResults.length" class="quick-search-state">
+        没有找到相关文章。
+      </div>
+
+      <div v-else-if="searchResults.length" class="quick-result-list">
+        <button
+          v-for="post in searchResults"
+          :key="post.slug"
+          type="button"
+          class="quick-result-item"
+          @click="goPost(post.slug)"
+        >
+          <span class="quick-result-title">{{ post.title }}</span>
+          <span class="quick-result-summary">{{ post.summary }}</span>
+        </button>
+      </div>
+
+      <template #footer>
+        <el-button @click="searchDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="goSearchPage">查看全部结果</el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <style lang="css" scoped>
@@ -123,5 +220,66 @@ const goEdit = () => {
 .icon {
   margin-right: 4px;
   font-size: 16px;
+}
+
+.quick-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.quick-search-state {
+  padding: 18px 0 4px;
+  color: var(--blog-muted);
+  text-align: left;
+}
+
+.quick-result-list {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.quick-result-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid var(--blog-border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--blog-surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-result-item:hover {
+  border-color: var(--blog-border-strong);
+}
+
+.quick-result-title {
+  color: var(--blog-text);
+  font-weight: 600;
+}
+
+.quick-result-summary {
+  color: var(--blog-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .navbar {
+    align-items: flex-start;
+    padding-right: 12px;
+  }
+
+  .nav-right {
+    gap: 8px;
+  }
+
+  .quick-search-form {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

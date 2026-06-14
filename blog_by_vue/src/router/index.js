@@ -52,6 +52,11 @@ const routes = [
     component: () => import("@/views/TagDetail.vue"),
   },
   {
+    path: "/search",
+    name: "Search",
+    component: () => import("@/views/Search.vue"),
+  },
+  {
     path:"/write",
     name:"Write",
     component:()=>import("@/views/Edit.vue")
