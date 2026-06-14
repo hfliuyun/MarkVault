@@ -250,6 +250,41 @@ tags:
         self.assertEqual(data["total"], 1)
         self.assertEqual(data["articles"][0]["slug"], "hotload")
 
+    def test_post_route_returns_sanitized_rendered_content(self):
+        self.write_post(
+            "posts/security",
+            "Security",
+            "security",
+            "2024-01-01",
+            body="""# Safe Heading
+
+<script>alert("xss")</script>
+
+[bad](javascript:alert(1))
+
+![safe](images/example.png)
+""",
+        )
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                response = client.get("/api/posts/security")
+                data = response.get_json()
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(response.status_code, 200)
+        content = data["content"]
+        lower_content = content.lower()
+        self.assertIn('id="safe-heading"', content)
+        self.assertIn('src="/api/media/posts/security/images/example.png"', content)
+        self.assertNotIn("<script", lower_content)
+        self.assertNotIn("alert(", lower_content)
+        self.assertNotIn("javascript:", lower_content)
+
     def test_legacy_abbrlink_map_can_be_read_from_post_frontmatter(self):
         self.write_post(
             "posts/git-basic",

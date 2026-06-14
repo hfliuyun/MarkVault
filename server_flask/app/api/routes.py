@@ -1,10 +1,10 @@
 
 import os
 import frontmatter
-import markdown
 from flask import current_app, jsonify, redirect, request, url_for
 from . import api_bp
 from app.services.content_index import ContentIndex, ContentIndexError
+from app.services.markdown_renderer import render_markdown_to_html
 from app.services.media import send_post_image
 from utils.saveUtils import save_image, save_post
 
@@ -54,7 +54,7 @@ def get_post_by_slug(slug):
             post_frontmatter = frontmatter.load(f)
             post = { 'slug': slug }
             post.update(post_frontmatter.metadata)
-            post['content'] = markdown.markdown(post_frontmatter.content)
+            post['content'] = render_markdown_to_html(post_frontmatter.content)
             return post
         except Exception as e:
             print(f"Error parsing {slug}.md: {e}")
