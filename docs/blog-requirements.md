@@ -20,10 +20,13 @@
 - 已修复 hash 路由下 TOC 跳转问题：目录点击会保留当前文章路由并使用 `/#/posts/:slug#heading` 形式定位正文标题。
 - 已初步统一首页、文章详情页、系列页的视觉风格，使用技术笔记 / 文档站风格的全局设计变量。
 - 已添加标准 commit message 模板 `.gitmessage`，当前仓库本地已配置 `git config commit.template .gitmessage`。
+- 已实现写文章模板生成器：`python3 manage.py new_post "标题" --slug example-slug` 会生成 `content/posts/<slug>/index.md` 和 `images/`，支持 `BLOG_CONTENT_ROOT`，并拒绝覆盖已有 slug。
 
 ### 0.2 待实现需求清单
 
 #### 0.2.1 写文章模板生成器
+
+状态：已完成。
 
 - 目标：提供轻量命令生成新文章目录和初始 Markdown 文件。
 - 范围：新增命令，例如 `python manage.py new_post "标题" --slug example-slug`，生成 `content/posts/<slug>/index.md` 和 `images/`。
@@ -118,16 +121,15 @@
 
 后续建议按以下顺序推进，每次只实现一个需求点：
 
-1. 写文章模板生成器。
-2. 分类和标签页面。
-3. 搜索功能。
-4. 旧链接兼容跳转。
-5. 文章详情组件拆分。
-6. 移动端文章侧边栏优化。
-7. Markdown HTML 安全清洗。
-8. 本地图片写作和上传链路。
-9. 测试补强。
-10. Notion 单向同步。
+1. 分类和标签页面。
+2. 搜索功能。
+3. 旧链接兼容跳转。
+4. 文章详情组件拆分。
+5. 移动端文章侧边栏优化。
+6. Markdown HTML 安全清洗。
+7. 本地图片写作和上传链路。
+8. 测试补强。
+9. Notion 单向同步。
 
 ## 1. 核心目标
 

@@ -26,6 +26,45 @@ Legacy posts can be backed up under `content/legacy/old-posts/`. They are not in
 
 If content is stored in a separate repository, mount it at the code repository's `content/` path or point `BLOG_CONTENT_ROOT` to the external location.
 
+## Create A New Post
+
+Use the lightweight template generator from the repository root:
+
+```sh
+python3 manage.py new_post "文章标题" --slug example-post
+```
+
+The command creates:
+
+```text
+content/posts/example-post/
+  index.md
+  images/
+```
+
+Optional metadata can be supplied with repeated category and tag options:
+
+```sh
+python3 manage.py new_post "逻辑回归" \
+  --slug logistic-regression \
+  --summary "逻辑回归学习笔记。" \
+  --category 机器学习 \
+  --tag 算法 \
+  --tag 监督学习
+```
+
+Series metadata is optional:
+
+```sh
+python3 manage.py new_post "博客内容索引" \
+  --slug blog-content-index \
+  --series-id blog-system \
+  --series-title 博客系统重构 \
+  --series-order 2
+```
+
+The generator refuses to overwrite an existing `content/posts/<slug>/` directory. It uses `BLOG_CONTENT_ROOT` when that environment variable is set, otherwise it writes to the repository-level `content/` path.
+
 ## Frontmatter Schema
 
 Required fields:
