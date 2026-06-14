@@ -1,10 +1,11 @@
 
 <script lang="js" setup>
 import { EditPen, Search, User } from '@element-plus/icons-vue'
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter,useRoute } from 'vue-router';
 import { searchPosts } from '@/api/posts';
 
+const SEARCH_DEBOUNCE_MS = 300;
 const router = useRouter();
 const route = useRoute();
 const searchDialogVisible = ref(false);
@@ -12,6 +13,8 @@ const searchInput = ref('');
 const searchResults = ref([]);
 const searchLoading = ref(false);
 const searchTouched = ref(false);
+let quickSearchTimer = null;
+let quickSearchRequestId = 0;
 
 const activeIndex = computed(() => {
   if (route.path.startsWith('/series')) return '2';
@@ -47,24 +50,67 @@ const goEdit = () => {
   router.push(`/write?edit=${abbrlink}`);
 }
 
-const runQuickSearch = async () => {
-  const keyword = searchInput.value.trim();
-  searchTouched.value = true;
+const clearQuickSearchTimer = () => {
+  if (quickSearchTimer) {
+    clearTimeout(quickSearchTimer);
+    quickSearchTimer = null;
+  }
+};
+
+const executeQuickSearch = async (keyword = searchInput.value.trim()) => {
+  const requestId = ++quickSearchRequestId;
+  searchTouched.value = Boolean(keyword);
   if (!keyword) {
     searchResults.value = [];
+    searchLoading.value = false;
     return;
   }
 
   searchLoading.value = true;
   try {
     const data = await searchPosts(keyword);
+    if (requestId !== quickSearchRequestId) {
+      return;
+    }
     searchResults.value = (data.articles || []).slice(0, 5);
   } catch (error) {
+    if (requestId !== quickSearchRequestId) {
+      return;
+    }
     console.error('搜索文章失败:', error);
     searchResults.value = [];
   } finally {
-    searchLoading.value = false;
+    if (requestId === quickSearchRequestId) {
+      searchLoading.value = false;
+    }
   }
+};
+
+const scheduleQuickSearch = () => {
+  clearQuickSearchTimer();
+  if (!searchDialogVisible.value) {
+    return;
+  }
+
+  const keyword = searchInput.value.trim();
+  if (!keyword) {
+    quickSearchRequestId += 1;
+    searchTouched.value = false;
+    searchResults.value = [];
+    searchLoading.value = false;
+    return;
+  }
+
+  searchTouched.value = true;
+  searchLoading.value = true;
+  quickSearchTimer = setTimeout(() => {
+    executeQuickSearch(keyword);
+  }, SEARCH_DEBOUNCE_MS);
+};
+
+const runQuickSearch = () => {
+  clearQuickSearchTimer();
+  executeQuickSearch();
 };
 
 const goSearchPage = () => {
@@ -81,6 +127,18 @@ const goPost = (slug) => {
   router.push({ name: 'PostDetail', params: { slug } });
 };
 
+watch(searchInput, scheduleQuickSearch);
+watch(searchDialogVisible, (visible) => {
+  if (visible) {
+    scheduleQuickSearch();
+    return;
+  }
+  clearQuickSearchTimer();
+  quickSearchRequestId += 1;
+  searchLoading.value = false;
+});
+
+onBeforeUnmount(clearQuickSearchTimer);
 </script>
 
 <template>

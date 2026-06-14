@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Calendar, CollectionTag, Search as SearchIcon } from '@element-plus/icons-vue';
 import { searchPosts } from '@/api/posts';
 
+const SEARCH_DEBOUNCE_MS = 300;
 const route = useRoute();
 const router = useRouter();
 const searchInput = ref('');
@@ -11,6 +12,9 @@ const results = ref([]);
 const loading = ref(false);
 const searched = ref(false);
 const total = ref(0);
+let searchTimer = null;
+let searchRequestId = 0;
+let ignoringRouteInputChange = false;
 
 const queryText = computed(() => {
   const query = route.query.q;
@@ -22,9 +26,22 @@ const formatDate = (dateText) => {
   return new Date(dateText).toLocaleDateString();
 };
 
-const fetchResults = async () => {
-  const keyword = queryText.value.trim();
-  searchInput.value = queryText.value;
+const clearSearchTimer = () => {
+  if (searchTimer) {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+  }
+};
+
+const replaceSearchQuery = (keyword) => {
+  router.replace({
+    name: 'Search',
+    query: keyword ? { q: keyword } : {},
+  });
+};
+
+const fetchResults = async (keyword) => {
+  const requestId = ++searchRequestId;
   searched.value = Boolean(keyword);
 
   if (!keyword) {
@@ -37,27 +54,82 @@ const fetchResults = async () => {
   loading.value = true;
   try {
     const data = await searchPosts(keyword);
+    if (requestId !== searchRequestId) {
+      return;
+    }
     results.value = data.articles || [];
     total.value = data.total || 0;
   } catch (error) {
+    if (requestId !== searchRequestId) {
+      return;
+    }
     console.error('搜索文章失败:', error);
     results.value = [];
     total.value = 0;
   } finally {
-    loading.value = false;
+    if (requestId === searchRequestId) {
+      loading.value = false;
+    }
   }
 };
 
 const submitSearch = () => {
+  clearSearchTimer();
   const keyword = searchInput.value.trim();
-  router.push({
-    name: 'Search',
-    query: keyword ? { q: keyword } : {},
-  });
+  if (queryText.value.trim() === keyword) {
+    fetchResults(keyword);
+    return;
+  }
+  replaceSearchQuery(keyword);
 };
 
-onMounted(fetchResults);
-watch(() => route.query.q, fetchResults);
+const scheduleSearch = () => {
+  if (ignoringRouteInputChange) {
+    ignoringRouteInputChange = false;
+    return;
+  }
+
+  clearSearchTimer();
+  const keyword = searchInput.value.trim();
+  if (!keyword) {
+    searchRequestId += 1;
+    searched.value = false;
+    results.value = [];
+    total.value = 0;
+    loading.value = false;
+    if (queryText.value) {
+      replaceSearchQuery('');
+    }
+    return;
+  }
+
+  searched.value = true;
+  loading.value = true;
+  searchTimer = setTimeout(() => {
+    if (queryText.value.trim() === keyword) {
+      fetchResults(keyword);
+      return;
+    }
+    replaceSearchQuery(keyword);
+  }, SEARCH_DEBOUNCE_MS);
+};
+
+watch(searchInput, scheduleSearch);
+watch(
+  () => route.query.q,
+  () => {
+    clearSearchTimer();
+    const keyword = queryText.value.trim();
+    if (searchInput.value !== queryText.value) {
+      ignoringRouteInputChange = true;
+      searchInput.value = queryText.value;
+    }
+    fetchResults(keyword);
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(clearSearchTimer);
 </script>
 
 <template>
