@@ -16,6 +16,12 @@ from app.services.post_template import (  # noqa: E402
     PostTemplateError,
     create_post_template,
 )
+from app.services.auth import (  # noqa: E402
+    AUTH_DIR,
+    TOTP_SECRET_PATH,
+    generate_totp_secret,
+    get_provisioning_uri,
+)
 
 
 def main() -> int:
@@ -24,6 +30,10 @@ def main() -> int:
 
     if args.command == "new_post":
         return handle_new_post(args)
+    if args.command == "setup_totp":
+        return handle_setup_totp(account=args.account)
+    if args.command == "reset_totp":
+        return handle_reset_totp(account=args.account)
 
     parser.print_help()
     return 1
@@ -69,7 +79,38 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Content root. Defaults to BLOG_CONTENT_ROOT or ./content.",
     )
+
+    setup_totp = subparsers.add_parser(
+        "setup_totp",
+        help="Generate a new TOTP secret and show a terminal QR code.",
+    )
+    setup_totp.add_argument(
+        "--account",
+        default="admin",
+        help="Account name embedded in the provisioning URI.",
+    )
+
+    reset_totp = subparsers.add_parser(
+        "reset_totp",
+        help="Remove the current TOTP secret and generate a new one.",
+    )
+    reset_totp.add_argument(
+        "--account",
+        default="admin",
+        help="Account name embedded in the provisioning URI.",
+    )
     return parser
+
+
+def print_qr_terminal(uri: str) -> None:
+    import qrcode
+
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(uri)
+    qr.make(fit=True)
+    matrix = qr.get_matrix()
+    for row in matrix:
+        print("".join("██" if cell else "  " for cell in row))
 
 
 def handle_new_post(args: argparse.Namespace) -> int:
@@ -95,6 +136,28 @@ def handle_new_post(args: argparse.Namespace) -> int:
     print(f"Created post: {generated.index_path}")
     print(f"Images directory: {generated.images_dir}")
     return 0
+
+
+def handle_setup_totp(account: str = "admin") -> int:
+    if TOTP_SECRET_PATH.exists():
+        print(f"error: {TOTP_SECRET_PATH} already exists. Run `python manage.py reset_totp` first.", file=sys.stderr)
+        return 2
+
+    secret = generate_totp_secret()
+    uri = get_provisioning_uri(account_name=account)
+    print("TOTP secret:", secret)
+    print("Provisioning URI:", uri)
+    print("QR code:")
+    print_qr_terminal(uri)
+    print("Scan the QR code with your authenticator app, then verify the 6-digit code via /api/auth/verify.")
+    return 0
+
+
+def handle_reset_totp(account: str = "admin") -> int:
+    if TOTP_SECRET_PATH.exists():
+        TOTP_SECRET_PATH.unlink()
+    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    return handle_setup_totp(account=account)
 
 
 if __name__ == "__main__":

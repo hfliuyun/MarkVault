@@ -1,13 +1,16 @@
 
-import os
 import frontmatter
 from flask import current_app, jsonify, redirect, request, url_for
 from . import api_bp
+from app.services.auth import require_auth
 from app.services.content_index import ContentIndex, ContentIndexError
 from app.services.markdown_renderer import render_markdown_to_html
 from app.services.media import send_post_image
 from utils.saveUtils import save_image, save_post
 
+
+
+import os
 
 
 POSTS_DIR = 'posts'
@@ -206,6 +209,7 @@ def get_mdpost_by_abbrlink_route(abbrlink):
         return jsonify({'error': 'Post not found'}), 404
 
 @api_bp.route('/upload_image', methods=['POST'])
+@require_auth
 def upload_image():
     if 'image' not in request.files:
         return jsonify({'error': 'No image file provided'}), 400
@@ -220,6 +224,7 @@ def upload_image():
     return jsonify({'url': image_url})
 
 @api_bp.route('/save_post', methods=['POST'])
+@require_auth
 def save_post_route():
     post_data = request.get_json()
     if not post_data:
