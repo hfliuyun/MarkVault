@@ -37,7 +37,7 @@ onMounted(() => {
 
 <template>
   <main class="home-container">
-    <header class="page-heading">
+    <header class="page-heading glass-panel">
       <h1>文章</h1>
       <p>按发布时间倒序整理的技术笔记。</p>
     </header>
@@ -124,26 +124,7 @@ onMounted(() => {
   text-align: left;
 }
 
-.page-heading {
-  padding-bottom: 30px;
-  margin-bottom: 40px;
-  text-align: center;
-}
 
-.page-heading h1 {
-  margin: 0 0 12px;
-  color: var(--blog-text);
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.5px;
-}
-
-.page-heading p {
-  margin: 0;
-  color: var(--blog-muted);
-  font-size: 16px;
-}
 
 .post-list {
   display: flex;
@@ -327,10 +308,6 @@ onMounted(() => {
 
   .article-title {
     font-size: 20px;
-  }
-
-  .page-heading h1 {
-    font-size: 28px;
   }
 }
 </style>

@@ -111,7 +111,7 @@ watch(() => props.type, fetchTaxonomy);
     </div>
 
     <template v-else-if="!detail">
-      <header class="taxonomy-header glass-panel">
+      <header class="page-heading glass-panel">
         <h1>{{ pageTitle }}</h1>
         <p>{{ pageDescription }}</p>
       </header>
@@ -149,7 +149,7 @@ watch(() => props.type, fetchTaxonomy);
     </div>
 
     <template v-else>
-      <header class="taxonomy-header glass-panel">
+      <header class="page-heading glass-panel">
         <router-link :to="config.listRoute" class="back-link">{{ config.backText }}</router-link>
         <h1>{{ pageTitle }}</h1>
         <p>{{ pageDescription }}</p>
@@ -204,12 +204,6 @@ watch(() => props.type, fetchTaxonomy);
   text-align: left;
 }
 
-.taxonomy-header {
-  padding: 40px;
-  margin-bottom: 30px;
-  text-align: center;
-}
-
 .back-link {
   color: var(--blog-accent);
   font-size: 14px;
@@ -220,21 +214,6 @@ watch(() => props.type, fetchTaxonomy);
 
 .back-link:hover {
   text-decoration: underline;
-}
-
-.taxonomy-header h1 {
-  margin: 0 0 12px;
-  color: var(--blog-text);
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.5px;
-}
-
-.taxonomy-header p {
-  margin: 0;
-  color: var(--blog-muted);
-  font-size: 16px;
 }
 
 .taxonomy-grid {

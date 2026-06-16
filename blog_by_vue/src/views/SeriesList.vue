@@ -21,10 +21,10 @@ onMounted(async () => {
 
 <template>
   <main class="series-page">
-    <div class="series-header">
+    <header class="page-heading glass-panel">
       <h1>系列</h1>
       <p>按主题聚合的文章目录。</p>
-    </div>
+    </header>
 
     <div v-if="loading" class="series-grid">
       <article v-for="i in 3" :key="i" class="series-card">
@@ -67,22 +67,7 @@ onMounted(async () => {
   text-align: left;
 }
 
-.series-header {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--blog-border);
-}
 
-.series-header h1 {
-  margin: 0 0 8px;
-  color: var(--blog-text);
-  font-size: 30px;
-  line-height: 1.25;
-}
-
-.series-header p {
-  margin: 0;
-  color: var(--blog-muted);
-}
 
 .series-grid {
   display: grid;
