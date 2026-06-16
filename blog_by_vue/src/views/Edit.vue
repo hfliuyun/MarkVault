@@ -5,9 +5,11 @@ import 'md-editor-v3/lib/style.css';
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import { useRoute } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
 
 
 const route = useRoute();
+const { requireAuth } = useAuth();
 const editID = route.query.edit || ''; // 获取编辑文章的缩略链接参数
 console.log('编辑文章的缩略链接:', editID);
 
@@ -31,11 +33,9 @@ onMounted(async  () => {
         fetchArticleById(editID);
     } else {
         console.log('新建文章，无需加载现有数据');
-        postData = reactive({
-            text: '## 从这里开始\n\n写下你的精彩内容...', // 编辑器 Markdown 内容
-            title: '', // 文章标题
-            categories: [], // 文章分类
-        });
+        postData.text = '## 从这里开始\n\n写下你的精彩内容...';
+        postData.title = '';
+        postData.categories = [];
     }
 });
 
@@ -64,6 +64,7 @@ async function fetchArticleById(id) {
 const onUploadImg = async (files, callback) => {
   // 使用 Promise.all 来支持同时上传多张图片
   try {
+    await requireAuth();
     const responses = await Promise.all(
       files.map((file) => {
         // 后端 API 需要的字段名是 'image'
@@ -108,6 +109,7 @@ const handleSave = async (markdownContent) => {
   console.log('Markdown内容:', markdownContent);
 
   try {
+    await requireAuth();
     // 构造发送到后端的数据包
     const payload = {
       title: postData.title,

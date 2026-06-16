@@ -1,8 +1,11 @@
 <script lang="js" setup>
-import { EditPen, Search, User, Sunny, Moon } from '@element-plus/icons-vue'
+import { EditPen, Link, Search, User, Sunny, Moon } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus';
 import { computed, onBeforeUnmount, ref, watch, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { searchPosts } from '@/api/posts';
+import TotpDialog from '@/components/TotpDialog.vue';
+import { useAuth } from '@/composables/useAuth';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const router = useRouter();
@@ -12,6 +15,7 @@ const searchInput = ref('');
 const searchResults = ref([]);
 const searchLoading = ref(false);
 const searchTouched = ref(false);
+const { authDialogVisible, checkAuth, clearAuth, isAuthenticated, requireAuth } = useAuth();
 let quickSearchTimer = null;
 let quickSearchRequestId = 0;
 
@@ -53,7 +57,8 @@ const activeIndex = computed(() => {
   if (route.path.startsWith('/series')) return '2';
   if (route.path.startsWith('/categories')) return '3';
   if (route.path.startsWith('/tags')) return '4';
-  if (route.path.startsWith('/about')) return '5';
+  if (route.path.startsWith('/paste')) return '5';
+  if (route.path.startsWith('/about')) return '6';
   return '1';
 });
 
@@ -70,7 +75,27 @@ const goSearch = () => {
   }
   searchDialogVisible.value = true;
 };
-const goLogin = () => {};
+const goPaste = () => {
+  router.push('/paste');
+};
+
+const goLogin = async () => {
+  if (isAuthenticated.value) {
+    clearAuth();
+    ElMessage.success('已退出登录');
+    return;
+  }
+  try {
+    await requireAuth();
+    ElMessage.success('验证成功');
+  } catch (error) {
+    // User cancelled the dialog.
+  }
+};
+
+onMounted(() => {
+  checkAuth();
+});
 
 const goEdit = () => {
   const abbrlink = route.path.split('/')[2];
@@ -183,7 +208,8 @@ onBeforeUnmount(() => {
         <router-link to="/series" class="nav-item" :class="{ active: activeIndex === '2' }">系列</router-link>
         <router-link to="/categories" class="nav-item" :class="{ active: activeIndex === '3' }">分类</router-link>
         <router-link to="/tags" class="nav-item" :class="{ active: activeIndex === '4' }">标签</router-link>
-        <router-link to="/about" class="nav-item" :class="{ active: activeIndex === '5' }">信息</router-link>
+        <router-link to="/paste" class="nav-item" :class="{ active: activeIndex === '5' }">剪贴板</router-link>
+        <router-link to="/about" class="nav-item" :class="{ active: activeIndex === '6' }">信息</router-link>
       </nav>
 
       <!-- 右侧功能区 -->
@@ -194,6 +220,10 @@ onBeforeUnmount(() => {
 
         <button type="button" class="glass-icon-btn" @click.prevent="goSearch" title="搜索">
           <el-icon><Search /></el-icon>
+        </button>
+
+        <button type="button" class="glass-icon-btn" @click.prevent="goPaste" title="剪贴板">
+          <el-icon><Link /></el-icon>
         </button>
 
         <el-dropdown v-if="isLegacyArticlePage" trigger="click">
@@ -212,11 +242,15 @@ onBeforeUnmount(() => {
           <el-icon><EditPen /></el-icon>
         </button>
 
-        <button type="button" class="glass-icon-btn" @click.prevent="goLogin" title="登录">
+        <button type="button" class="glass-icon-btn" @click.prevent="goLogin" :title="isAuthenticated ? '退出登录' : '登录'">
           <el-icon><User /></el-icon>
         </button>
       </div>
     </header>
+
+    <TotpDialog
+      v-model:visible="authDialogVisible"
+    />
 
     <el-dialog
       v-model="searchDialogVisible"
