@@ -103,6 +103,7 @@ class ContentIndex:
                     "title": series["title"],
                     "count": len(series["posts"]),
                     "updated_at": series["updated_at"],
+                    "description_html": series["description_html"],
                 }
                 for series in sorted(
                     self.series_by_id.values(),
@@ -121,6 +122,7 @@ class ContentIndex:
             "title": series["title"],
             "count": len(series["posts"]),
             "updated_at": series["updated_at"],
+            "description_html": series["description_html"],
             "posts": series["posts"],
         }
 
@@ -181,6 +183,15 @@ class ContentIndex:
                     stat.st_size,
                 )
             )
+        for readme_path in self._iter_series_readme_paths():
+            stat = readme_path.stat()
+            signature.append(
+                (
+                    readme_path.relative_to(self.content_root).as_posix(),
+                    stat.st_mtime_ns,
+                    stat.st_size,
+                )
+            )
         legacy_map_signature = self._build_file_signature(self.legacy_map_path)
         if legacy_map_signature:
             signature.append(legacy_map_signature)
@@ -201,6 +212,10 @@ class ContentIndex:
             *self.posts_root.glob("*/index.md"),
             *self.series_root.glob("*/*/index.md"),
         ]
+        return sorted(paths, key=lambda path: path.relative_to(self.content_root).as_posix())
+
+    def _iter_series_readme_paths(self) -> list[Path]:
+        paths = [*self.series_root.glob("*/README.md")]
         return sorted(paths, key=lambda path: path.relative_to(self.content_root).as_posix())
 
     def _load_post(self, index_path: Path) -> Post:
@@ -252,11 +267,30 @@ class ContentIndex:
             series_title = str(post.series.get("title") or series_id)
             grouped.setdefault(
                 series_id,
-                {"id": series_id, "title": series_title, "posts": [], "updated_at": ""},
+                {
+                    "id": series_id,
+                    "title": series_title,
+                    "posts": [],
+                    "updated_at": "",
+                    "description_md": "",
+                    "description_html": "",
+                },
             )
             grouped[series_id]["posts"].append(post)
 
         for series in grouped.values():
+            readme_path = self.series_root / series["id"] / "README.md"
+            if readme_path.exists():
+                description_md, readme_title = self._load_series_readme(readme_path)
+                series["description_md"] = description_md
+                series["description_html"] = (
+                    render_markdown_to_html(description_md)
+                    if description_md.strip()
+                    else ""
+                )
+                if readme_title:
+                    series["title"] = readme_title
+
             ordered_posts = sorted(
                 series["posts"],
                 key=lambda post: (
@@ -270,6 +304,18 @@ class ContentIndex:
             )
 
         return grouped
+
+    def _load_series_readme(self, readme_path: Path) -> tuple[str, str]:
+        try:
+            parsed = frontmatter.load(readme_path)
+        except Exception as error:  # noqa: BLE001
+            raise ContentIndexError(
+                f"{readme_path} has invalid frontmatter or Markdown: {error}"
+            ) from error
+
+        description_md = parsed.content
+        title = str(parsed.metadata.get("title") or "").strip()
+        return description_md, title
 
     def _build_legacy_redirects(self, posts: list[Post]) -> dict[str, str]:
         redirects: dict[str, str] = {}

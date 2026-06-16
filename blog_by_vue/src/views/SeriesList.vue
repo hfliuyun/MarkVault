@@ -39,6 +39,11 @@ onMounted(async () => {
         <router-link :to="{ name: 'SeriesDetail', params: { seriesId: item.id } }" class="series-title">
           {{ item.title }}
         </router-link>
+        <div
+          v-if="item.description_html"
+          class="series-description markdown-body"
+          v-html="item.description_html"
+        ></div>
         <div class="series-meta">
           <span>
             <el-icon><Collection /></el-icon>
@@ -103,6 +108,25 @@ onMounted(async () => {
 }
 
 .series-title:hover {
+  color: var(--blog-accent);
+}
+
+.series-description {
+  margin: 0 0 16px;
+  color: var(--blog-subtle);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.series-description :deep(p) {
+  margin: 0 0 10px;
+}
+
+.series-description :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.series-description :deep(a) {
   color: var(--blog-accent);
 }
 

@@ -20,6 +20,14 @@ content/series/machine-learning-basic/logistic-regression/
     sigmoid.png
 ```
 
+Series can also include a description file:
+
+```text
+content/series/machine-learning-basic/README.md
+```
+
+The file may contain optional frontmatter and Markdown body. If `title` is set in the frontmatter, it overrides the series title derived from post metadata.
+
 The folder path is only for local organization. Public URLs still use the `slug` from frontmatter, and series membership still comes from the `series` metadata.
 
 Legacy posts can be backed up under `content/legacy/old-posts/`. They are not indexed by the new APIs.
@@ -123,6 +131,8 @@ Series rules:
 
 - Posts with the same `series.id` belong to the same series.
 - The display name comes from `series.title`.
+- If `content/series/<series-id>/README.md` exists, its frontmatter `title` takes priority for the series display name.
+- The README body is rendered as the series description and is shown in full on the series list and detail pages.
 - Series detail pages sort by `series.order`.
 - Posts without `series.order` are placed after ordered posts.
 

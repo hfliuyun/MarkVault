@@ -90,6 +90,14 @@ onMounted(() => {
             </router-link>
           </span>
         </div>
+        <router-link
+          v-if="article.series?.id"
+          :to="{ name: 'SeriesDetail', params: { seriesId: article.series.id } }"
+          class="series-badge"
+        >
+          <span class="series-prefix">系列</span>
+          {{ article.series.title || article.series.id }}
+        </router-link>
         <p class="summary">
           {{ article.summary }}
         </p>
@@ -174,7 +182,7 @@ onMounted(() => {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 1; /* Make the whole card clickable for the title link conceptually, though we only wrap the h2 */
+  z-index: 0;
 }
 .post-item {
   position: relative; /* For the ::before pseudo element if we wanted whole card click */
@@ -182,6 +190,11 @@ onMounted(() => {
 
 .title-link:hover {
   color: var(--blog-accent);
+}
+
+.title-link {
+  position: relative;
+  z-index: 2;
 }
 
 .article-meta-wrap {
@@ -192,7 +205,36 @@ onMounted(() => {
   color: var(--blog-muted);
   font-size: 14px;
   position: relative;
-  z-index: 2; /* Above the whole card clickable area if implemented */
+  z-index: 2;
+}
+
+.series-badge {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 5px 10px;
+  border: 1px solid rgba(64, 158, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(64, 158, 255, 0.08);
+  color: var(--blog-accent);
+  font-size: 13px;
+  line-height: 1.3;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.series-badge:hover {
+  border-color: var(--blog-accent);
+  background: rgba(64, 158, 255, 0.14);
+}
+
+.series-prefix {
+  color: var(--blog-muted);
 }
 
 .post-meta-item {

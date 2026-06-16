@@ -87,7 +87,8 @@ Example response:
       "id": "machine-learning-basic",
       "title": "机器学习基础",
       "count": 1,
-      "updated_at": "2022-01-29 14:40:13"
+      "updated_at": "2022-01-29 14:40:13",
+      "description_html": "<p>...</p>"
     }
   ]
 }
@@ -105,6 +106,7 @@ Example response:
   "title": "机器学习基础",
   "count": 1,
   "updated_at": "2022-01-29 14:40:13",
+  "description_html": "<p>...</p>",
   "posts": [
     {
       "title": "逻辑回归",
@@ -122,6 +124,13 @@ Error responses:
 
 - `404`: series not found
 - `500`: content index error
+
+Series description behavior:
+
+- `content/series/<series-id>/README.md` may contain optional frontmatter and Markdown body.
+- If the README frontmatter includes `title`, it overrides the series title in API responses.
+- If the README does not exist, `description_html` is an empty string.
+- The README body is rendered as sanitized HTML and returned in full.
 
 ## `GET /api/search`
 

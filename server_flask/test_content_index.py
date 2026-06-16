@@ -46,6 +46,16 @@ tags:
         (post_dir / "index.md").write_text(frontmatter + body, encoding="utf-8")
         return post_dir / "index.md"
 
+    def write_series_readme(self, series_id, body="", title=None):
+        series_dir = self.content_root / "series" / series_id
+        series_dir.mkdir(parents=True, exist_ok=True)
+        frontmatter = ""
+        if title is not None:
+            frontmatter = f"---\ntitle: {title}\n---\n"
+        readme_path = series_dir / "README.md"
+        readme_path.write_text(frontmatter + body, encoding="utf-8")
+        return readme_path
+
     def test_loads_standalone_and_series_posts_into_one_index(self):
         self.write_post(
             "posts/git-basic",
@@ -87,6 +97,137 @@ tags:
             [post["slug"] for post in series["posts"]],
             ["decision-tree", "logistic-regression"],
         )
+
+    def test_series_readme_overrides_title_and_renders_description(self):
+        self.write_post(
+            "series/ml-basic/logistic-regression",
+            "Logistic Regression",
+            "logistic-regression",
+            "2024-01-02",
+            extra_frontmatter="""series:
+  id: ml-basic
+  title: ML Basic From Post
+  order: 1
+""",
+        )
+        self.write_series_readme(
+            "ml-basic",
+            body="This **series** introduces logistic models.\n\n<script>alert('x')</script>",
+            title="ML Basic From README",
+        )
+
+        index = ContentIndex(self.content_root)
+        series = index.get_series("ml-basic")
+        listed_series = index.list_series()["series"][0]
+
+        self.assertEqual(series["title"], "ML Basic From README")
+        self.assertEqual(listed_series["title"], "ML Basic From README")
+        self.assertIn("<strong>series</strong>", series["description_html"])
+        self.assertNotIn("<script", series["description_html"].lower())
+        self.assertEqual(series["description_html"], listed_series["description_html"])
+
+    def test_series_without_readme_has_empty_description(self):
+        self.write_post(
+            "series/ml-basic/logistic-regression",
+            "Logistic Regression",
+            "logistic-regression",
+            "2024-01-02",
+            extra_frontmatter="""series:
+  id: ml-basic
+  title: ML Basic
+""",
+        )
+
+        index = ContentIndex(self.content_root)
+        series = index.get_series("ml-basic")
+
+        self.assertEqual(series["title"], "ML Basic")
+        self.assertEqual(series["description_html"], "")
+        self.assertEqual(index.list_series()["series"][0]["description_html"], "")
+
+    def test_series_route_returns_description_html(self):
+        self.write_post(
+            "series/ml-basic/logistic-regression",
+            "Logistic Regression",
+            "logistic-regression",
+            "2024-01-02",
+            extra_frontmatter="""series:
+  id: ml-basic
+  title: ML Basic
+""",
+        )
+        self.write_series_readme("ml-basic", body="README description.")
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                list_response = client.get("/api/series")
+                detail_response = client.get("/api/series/ml-basic")
+                list_data = list_response.get_json()
+                detail_data = detail_response.get_json()
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertIn("README description.", list_data["series"][0]["description_html"])
+        self.assertEqual(
+            list_data["series"][0]["description_html"],
+            detail_data["description_html"],
+        )
+
+    def test_series_readme_change_reloads_on_next_request(self):
+        self.write_post(
+            "series/ml-basic/logistic-regression",
+            "Logistic Regression",
+            "logistic-regression",
+            "2024-01-02",
+            extra_frontmatter="""series:
+  id: ml-basic
+  title: ML Basic
+""",
+        )
+        readme_path = self.write_series_readme("ml-basic", body="Initial description.")
+        app = create_app()
+        app.config["CONTENT_ROOT"] = self.content_root
+        routes._content_index = None
+
+        try:
+            with app.test_client() as client:
+                initial_response = client.get("/api/series/ml-basic")
+                self.assertIn(
+                    "Initial description.",
+                    initial_response.get_json()["description_html"],
+                )
+
+                readme_path.write_text("Updated description.", encoding="utf-8")
+
+                response = client.get("/api/series/ml-basic")
+                data = response.get_json()
+        finally:
+            routes._content_index = None
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Updated description.", data["description_html"])
+
+    def test_invalid_series_readme_raises_content_index_error(self):
+        self.write_post(
+            "series/ml-basic/logistic-regression",
+            "Logistic Regression",
+            "logistic-regression",
+            "2024-01-02",
+            extra_frontmatter="""series:
+  id: ml-basic
+  title: ML Basic
+""",
+        )
+        readme_path = self.write_series_readme("ml-basic")
+        readme_path.write_text("---\ntitle: [broken\n---\nbody", encoding="utf-8")
+
+        with self.assertRaisesRegex(ContentIndexError, "invalid frontmatter or Markdown"):
+            ContentIndex(self.content_root)
 
     def test_duplicate_slug_is_detected_across_content_layouts(self):
         self.write_post("posts/git-basic", "Git Basic", "same-slug", "2024-01-01")

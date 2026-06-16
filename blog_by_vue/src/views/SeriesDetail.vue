@@ -49,6 +49,11 @@ watch(() => route.params.seriesId, fetchSeries);
         <router-link to="/series" class="back-link">返回系列</router-link>
         <h1>{{ series.title }}</h1>
         <p>{{ series.count }} 篇文章 · 更新于 {{ new Date(series.updated_at).toLocaleDateString() }}</p>
+        <div
+          v-if="series.description_html"
+          class="series-description markdown-body"
+          v-html="series.description_html"
+        ></div>
       </header>
 
       <div class="post-list">
@@ -114,6 +119,27 @@ watch(() => route.params.seriesId, fetchSeries);
   margin: 0;
   color: var(--blog-muted);
   font-size: 16px;
+}
+
+.series-description {
+  max-width: 640px;
+  margin: 24px auto 0;
+  color: var(--blog-subtle);
+  font-size: 15px;
+  line-height: 1.75;
+  text-align: left;
+}
+
+.series-description :deep(p) {
+  margin: 0 0 12px;
+}
+
+.series-description :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.series-description :deep(a) {
+  color: var(--blog-accent);
 }
 
 .post-list {
