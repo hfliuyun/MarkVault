@@ -4,6 +4,121 @@ All routes are mounted under `/api`.
 
 The public blog APIs read Markdown content from `BLOG_CONTENT_ROOT` when that environment variable is set. If it is unset, the backend falls back to the local `content/` path.
 
+## Authentication
+
+Admin-only APIs use TOTP verification to issue a short-lived JWT. Runtime auth data is stored under `server_flask/data/`, which must not be committed.
+
+Initial setup:
+
+```sh
+python manage.py setup_totp --account admin
+```
+
+Scan the terminal QR code with an authenticator app, or manually enter the printed secret. Use `reset_totp` to replace the secret.
+
+Authenticated requests must include:
+
+```text
+Authorization: Bearer <jwt-token>
+```
+
+### `POST /api/auth/verify`
+
+Verifies a 6-digit TOTP code and returns a JWT.
+
+Request:
+
+```json
+{
+  "code": "123456"
+}
+```
+
+Success response:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expires_in": 7200
+}
+```
+
+Error responses:
+
+- `400`: TOTP has not been configured
+- `401`: invalid code
+
+### `GET /api/auth/status`
+
+Checks whether the current bearer token is valid.
+
+Success response:
+
+```json
+{
+  "authenticated": true
+}
+```
+
+Invalid or missing token:
+
+```json
+{
+  "authenticated": false
+}
+```
+
+### `GET /api/auth/provisioning-uri`
+
+Returns the configured `otpauth://` URI for manual authenticator import. This endpoint is intended to help first-time binding after the server-side secret has already been generated.
+
+## Pastebin
+
+Paste data is stored as JSON files under `server_flask/data/pastes/`.
+
+### `POST /api/paste`
+
+Creates a paste. Requires authentication.
+
+Request:
+
+```json
+{
+  "content": "print('hello world')",
+  "title": "Example",
+  "language": "python",
+  "expires_in": "1d"
+}
+```
+
+`expires_in` supports `1h`, `1d`, `1w`, and `never`. The default is `1d`.
+
+Success response:
+
+```json
+{
+  "id": "a1b2c3d4",
+  "title": "Example",
+  "content": "print('hello world')",
+  "language": "python",
+  "created_at": "2026-06-16T23:00:00+08:00",
+  "expires_at": "2026-06-17T23:00:00+08:00",
+  "url": "/paste/a1b2c3d4"
+}
+```
+
+### `GET /api/paste/:id`
+
+Returns one public paste, or `404` when it does not exist or has expired.
+
+### `GET /api/pastes`
+
+Lists non-expired pastes. Requires authentication. List items omit `content`.
+
+### `DELETE /api/paste/:id`
+
+Deletes a paste. Requires authentication.
+
 ## `GET /api/posts`
 
 Returns a paginated post list sorted by `date` descending.

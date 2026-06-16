@@ -57,6 +57,16 @@ const routes = [
     component: () => import("@/views/Search.vue"),
   },
   {
+    path: "/paste",
+    name: "PasteHome",
+    component: () => import("@/views/PasteHome.vue"),
+  },
+  {
+    path: "/paste/:id",
+    name: "PasteView",
+    component: () => import("@/views/PasteView.vue"),
+  },
+  {
     path:"/write",
     name:"Write",
     component:()=>import("@/views/Edit.vue")

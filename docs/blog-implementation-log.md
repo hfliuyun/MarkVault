@@ -203,6 +203,25 @@
 - **禁止脚本和嵌入执行面**：`script`、`style`、`iframe` 等危险块会被移除
 - **禁止危险协议和事件属性**：`javascript:`、`onclick`、`onerror` 等不会出现在渲染结果中
 
+### TOTP 管理认证与 Pastebin 剪贴板
+
+**状态：** 已完成
+
+**目标：** 为管理操作增加轻量 TOTP 鉴权，并提供跨设备同步文本和代码片段的剪贴板。
+
+**实现方式：**
+- 新增 `python manage.py setup_totp` 和 `reset_totp`，在 `server_flask/data/auth/` 生成运行时 TOTP 密钥
+- 后端通过 TOTP 验证签发 2 小时 JWT，管理接口使用 `Authorization: Bearer <token>`
+- 新增 Paste 文件存储服务，数据写入 `server_flask/data/pastes/*.json`
+- 前端新增登录弹窗、JWT 本地状态、axios token 注入和 Paste 创建/查看页面
+
+**验收标准：**
+- ✅ 首次绑定通过 CLI 生成二维码和密钥，前端登录弹窗说明绑定方式
+- ✅ `/api/auth/verify` 可用 6 位动态码换取 JWT，`/api/auth/status` 可校验登录状态
+- ✅ 文章保存、图片上传、Paste 创建/列表/删除均要求认证
+- ✅ `/paste` 可创建和管理 paste，`/paste/:id` 可公开查看并复制内容
+- ✅ 过期 paste 会在读取或列表时清理，列表接口不返回正文内容
+
 ## 参考文档
 
 - [需求清单](blog-requirements.md)：当前待实现功能需求
