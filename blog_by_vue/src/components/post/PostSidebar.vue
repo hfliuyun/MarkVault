@@ -92,6 +92,7 @@ watch(() => props.article.slug, closeDrawer);
   flex: 0 0 280px;
   width: 280px;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  align-self: stretch;
 }
 
 .post-sidebar-shell.collapsed {
