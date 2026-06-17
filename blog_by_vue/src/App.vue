@@ -9,7 +9,11 @@ import PageHeader from './components/PageHeader.vue';
     <PageHeader />
      
     <main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <transition name="fade-page" mode="out-in">
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </router-view>
     </main>
   </div>
 </template>
@@ -25,5 +29,17 @@ import PageHeader from './components/PageHeader.vue';
   flex-grow: 1;
   width: 100%;
   padding: 100px 20px 60px; /* Top padding to prevent overlap with fixed header */
+}
+
+/* Page Transition Animations */
+.fade-page-enter-active,
+.fade-page-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.fade-page-enter-from,
+.fade-page-leave-to {
+  opacity: 0;
+  transform: translateY(15px);
 }
 </style>

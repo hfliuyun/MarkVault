@@ -32,12 +32,14 @@ const enhanceCurrentArticle = () => {
 
 const fetchArticle = async () => {
   loading.value = true;
-  article.value = null;
+  // 保持旧文章内容以避免屏幕闪烁，直到新数据返回
 
   try {
-    article.value = await getPost(route.params.slug);
+    const newArticle = await getPost(route.params.slug);
+    article.value = newArticle;
   } catch (error) {
     console.error('获取文章详情失败:', error);
+    article.value = null;
   } finally {
     loading.value = false;
   }

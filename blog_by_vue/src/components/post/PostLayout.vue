@@ -13,12 +13,12 @@ defineProps({
 
 <template>
   <div class="post-page-container">
-    <div v-if="loading" class="post-content-card glass-panel">
+    <div v-if="loading && !article" class="post-content-card glass-panel delayed-skeleton">
       <el-skeleton :rows="1" animated class="title-skeleton" />
       <el-skeleton :rows="10" animated />
     </div>
 
-    <div v-else-if="article" class="post-layout">
+    <div v-else-if="article" class="post-layout" v-loading="loading">
       <slot name="sidebar" />
       <div class="post-content-wrapper">
         <slot name="article" />
@@ -77,5 +77,16 @@ defineProps({
   .post-content-card {
     padding: 24px 20px;
   }
+}
+
+.delayed-skeleton {
+  animation: skeleton-fade-in 0.4s ease forwards;
+  animation-delay: 0.15s;
+  opacity: 0;
+}
+
+@keyframes skeleton-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>
