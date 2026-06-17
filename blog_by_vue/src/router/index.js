@@ -76,6 +76,21 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    // Ignore hash changes on the same page (handled manually by TOC)
+    if (to.path === from.path) {
+      return false;
+    }
+    // Wait for the fade-out transition to complete (0.25s) before scrolling to top
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ top: 0 });
+      }, 250);
+    });
+  }
 });
 
 export default router;
