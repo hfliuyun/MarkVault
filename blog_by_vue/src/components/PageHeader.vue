@@ -62,10 +62,8 @@ const activeIndex = computed(() => {
   return '1';
 });
 
-const isLegacyArticlePage = computed(() => route.path.startsWith('/p/'));
-
-const goWrite = () => {
-  router.push('/write');
+const goManage = () => {
+  router.push('/manage');
 };
 
 const goSearch = () => {
@@ -96,15 +94,6 @@ const goLogin = async () => {
 onMounted(() => {
   checkAuth();
 });
-
-const goEdit = () => {
-  const abbrlink = route.path.split('/')[2];
-  if(!abbrlink) {
-    console.error('无法获取文章缩略链接,无法编辑文章');
-    return;
-  }
-  router.push(`/write?edit=${abbrlink}`);
-}
 
 const clearQuickSearchTimer = () => {
   if (quickSearchTimer) {
@@ -226,19 +215,7 @@ onBeforeUnmount(() => {
           <el-icon><Link /></el-icon>
         </button>
 
-        <el-dropdown v-if="isLegacyArticlePage" trigger="click">
-          <button type="button" class="glass-icon-btn" title="编辑">
-            <el-icon><EditPen /></el-icon>
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="goEdit">编辑文章</el-dropdown-item>
-              <el-dropdown-item @click="goWrite">新建文章</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-
-        <button v-if="!isLegacyArticlePage" type="button" class="glass-icon-btn" @click.prevent="goWrite" title="写文章">
+        <button type="button" class="glass-icon-btn" @click.prevent="goManage" title="管理">
           <el-icon><EditPen /></el-icon>
         </button>
 

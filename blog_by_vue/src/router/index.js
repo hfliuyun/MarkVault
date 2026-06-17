@@ -67,9 +67,9 @@ const routes = [
     component: () => import("@/views/PasteView.vue"),
   },
   {
-    path:"/write",
-    name:"Write",
-    component:()=>import("@/views/Edit.vue")
+    path: "/manage",
+    name: "Manage",
+    component: () => import("@/views/ManagePosts.vue"),
   }
 ];
 
