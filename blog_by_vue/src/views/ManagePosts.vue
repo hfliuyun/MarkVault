@@ -97,7 +97,11 @@ async function loadTaxonomies() {
     ]);
     categoryOptions.value = (categories.categories || []).map((item) => item.name);
     tagOptions.value = (tags.tags || []).map((item) => item.name);
-    seriesOptions.value = (series.series || []).map((item) => ({ id: item.id, title: item.title }));
+    seriesOptions.value = (series.series || []).map((item) => ({ 
+      id: item.id, 
+      title: item.title,
+      count: item.count || 0
+    }));
   } catch (error) {
     // 选项加载失败不阻断模板创建，用户仍可手动输入。
   }
@@ -107,8 +111,13 @@ function onSeriesIdChange(id) {
   const match = seriesOptions.value.find((item) => item.id === id);
   if (match) {
     tpl.series_title = match.title;
+    tpl.series_order = match.count + 1;
   }
 }
+
+const isExistingSeries = computed(() => {
+  return seriesOptions.value.some((item) => item.id === tpl.series_id);
+});
 
 const slugValid = computed(() => SLUG_RE.test(tpl.slug.trim()));
 
@@ -395,7 +404,12 @@ onMounted(async () => {
               </div>
               <div class="field">
                 <label>系列标题</label>
-                <input v-model="tpl.series_title" class="text-input" placeholder="选择已有系列后自动填充，可修改" />
+                <input 
+                  v-model="tpl.series_title" 
+                  class="text-input" 
+                  :disabled="isExistingSeries"
+                  :placeholder="isExistingSeries ? '已有系列不可修改标题' : '填写新系列标题'" 
+                />
               </div>
               <div class="field">
                 <label>系列排序</label>
@@ -524,6 +538,33 @@ onMounted(async () => {
   background: var(--blog-surface);
   color: var(--blog-text);
   outline: none;
+  transition: all 0.3s ease;
+}
+
+.text-input:focus,
+.text-area:focus {
+  border-color: var(--blog-accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+  background: var(--blog-surface-hover);
+}
+
+.text-input:disabled,
+.text-area:disabled {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--blog-muted);
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .text-input:disabled,
+[data-theme='dark'] .text-area:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .text-input:focus,
+[data-theme='dark'] .text-area:focus {
+  box-shadow: 0 0 0 3px rgba(41, 151, 255, 0.2);
 }
 
 .text-input {
