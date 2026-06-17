@@ -161,6 +161,7 @@ textarea {
   --el-border-radius-small: 4px !important;
   --el-border-radius-round: 20px !important;
   --el-box-shadow-light: var(--glass-shadow) !important;
+  --el-fill-color-light: var(--blog-surface-hover) !important;
 }
 
 .el-dialog {
@@ -171,9 +172,36 @@ textarea {
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--glass-shadow) !important;
 }
+
+.el-popper {
+  background: var(--blog-surface) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--blog-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* Ensure the popper arrow matches the glassmorphism */
+.el-popper .el-popper__arrow::before {
+  background: var(--blog-surface) !important;
+  border: 1px solid var(--blog-border) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+}
+
 .el-dialog__title {
   color: var(--blog-text) !important;
   font-weight: 600 !important;
+}
+
+/* Glassmorphism for tags (especially inside select inputs) */
+.el-tag {
+  background: var(--blog-surface) !important;
+  border: 1px solid var(--blog-border) !important;
+  color: var(--blog-text) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
 }
 
 /* Unified Page Heading */
