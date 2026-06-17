@@ -1,6 +1,6 @@
 # MarkVault 实现日志
 
-本文档记录已完成的功能和实现历史，用于追溯和参考。当前版本的待实现需求参见 [需求清单](blog-requirements.md)。
+本文档记录已完成的功能和实现历史，用于追溯和参考。当前版本的待实现需求参见 [需求清单](requirements.md)。
 
 ## 基础能力（Phase 1）
 
@@ -222,9 +222,49 @@
 - ✅ `/paste` 可创建和管理 paste，`/paste/:id` 可公开查看并复制内容
 - ✅ 过期 paste 会在读取或列表时清理，列表接口不返回正文内容
 
+### 系列简介与展示增强
+
+**状态：** 已完成
+
+**目标：** 为系列增加独立简介文件，并在系列列表、系列详情和首页文章卡片中展示系列信息。
+
+**实现方式：**
+- 支持在 `content/series/<series-id>/README.md` 编写系列简介
+- README 可包含可选 frontmatter，`title` 字段会覆盖从文章 metadata 推导出的系列标题
+- 后端系列索引解析 README 正文并渲染为 `description_html`
+- `/api/series` 和 `/api/series/:series_id` 返回系列简介 HTML
+- 前端系列列表页和系列详情页展示完整简介
+- 首页文章卡片显示可点击的系列标签徽章
+
+**验收标准：**
+- ✅ 没有 README 的系列保持兼容，`description_html` 为空
+- ✅ README 正文支持 Markdown 渲染和后端 HTML 清洗
+- ✅ 系列列表、系列详情和首页均能展示或跳转系列信息
+
+### 文章管理页面
+
+**状态：** 已完成
+
+**目标：** 用 `/manage` 页面替代旧 `/write` 编辑器，提供文章列表、模板下载、上传发布和删除能力。
+
+**实现方式：**
+- 后端新增 `post_manager.py`，负责模板 ZIP 生成、上传 ZIP 校验、发布写入和文章删除
+- 后端新增管理接口：`GET /api/manage/posts`、`POST /api/posts/template`、`POST /api/posts/upload`、`DELETE /api/posts/:slug`
+- 管理接口复用 TOTP/JWT 鉴权
+- 前端新增 `src/api/manage.js` 和 `ManagePosts.vue`
+- 前端路由新增 `/manage`，页面包含文章列表、创建模板和上传文章功能
+- 上传文章根据 frontmatter 自动写入 `content/posts/<slug>/` 或 `content/series/<series-id>/<slug>/`
+
+**验收标准：**
+- ✅ 未登录访问管理接口会返回未授权
+- ✅ 可下载包含 `index.md` 和 `images/` 目录的模板 ZIP
+- ✅ 可上传合法 ZIP 并发布文章
+- ✅ 可查看全部已发布文章并删除指定文章
+- ✅ 后端包含文章管理 API 测试覆盖
+
 ## 参考文档
 
-- [需求清单](blog-requirements.md)：当前待实现功能需求
-- [开发指南](blog-development-guide.md)：架构决策和开发规范
-- [架构文档](blog-architecture.md)：简要架构和数据流
-- [内容写作指南](blog-content-guide.md)：frontmatter 规范和目录结构
+- [需求清单](requirements.md)：当前待实现功能需求
+- [开发指南](development-guide.md)：架构决策和开发规范
+- [架构文档](architecture.md)：简要架构和数据流
+- [内容写作指南](content-guide.md)：frontmatter 规范和目录结构

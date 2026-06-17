@@ -15,11 +15,15 @@ content tree.
 
 - Markdown post index built from `content/posts/*/index.md`
 - Series support through `content/series/*/*/index.md`
+- Series descriptions through `content/series/<series-id>/README.md`
 - Stable article URLs based on frontmatter `slug`
 - Category, tag, series, search, and legacy-link APIs
 - Markdown rendering with table-of-contents data
 - Local post images served from each post's `images/` directory
-- Vue 3 frontend with post pages, taxonomy pages, search, and series pages
+- TOTP administrator authentication with short-lived JWTs
+- Pastebin-style cross-device clipboard for text and code snippets
+- Article management page for template download, upload publishing, and post list operations
+- Vue 3 frontend with post pages, taxonomy pages, search, series pages, paste pages, and management pages
 - Lightweight post template generator via `manage.py`
 
 ## Project Structure
@@ -28,8 +32,9 @@ content tree.
 .
 ├── blog_by_vue/       # Vue 3 + Vite frontend
 ├── server_flask/      # Flask backend API
-├── docs/              # Architecture, API, migration, and content guides
+├── docs/              # Architecture, API, requirements, and content guides
 ├── manage.py          # Blog maintenance commands
+├── server_flask/data/ # Runtime auth and paste data, ignored by Git
 └── content -> ...     # Optional local symlink to an external content repo
 ```
 
@@ -43,6 +48,7 @@ content/
       images/
   series/
     series-id/
+      README.md
       post-slug/
         index.md
         images/
@@ -61,7 +67,7 @@ content/
 Clone the code repository:
 
 ```sh
-git clone <repo-url> markvault
+git clone https://github.com/hfliuyun/MarkVault.git markvault
 cd markvault
 ```
 
@@ -84,10 +90,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Create the first TOTP administrator secret when admin features are needed:
+
+```sh
+cd ..
+python3 manage.py setup_totp --account admin
+```
+
 Install frontend dependencies:
 
 ```sh
-cd ../blog_by_vue
+cd blog_by_vue
 npm install
 ```
 
@@ -151,10 +164,13 @@ npm run build
 
 ## Documentation
 
-- `docs/blog-architecture.md`: architecture and data flow
-- `docs/blog-api.md`: public API shape
-- `docs/blog-content-guide.md`: content layout and frontmatter guide
-- `docs/blog-migration.md`: migration notes
+- [docs/architecture.md](docs/architecture.md): architecture and data flow
+- [docs/api.md](docs/api.md): public API reference
+- [docs/content-guide.md](docs/content-guide.md): content layout and frontmatter guide
+- [docs/development-guide.md](docs/development-guide.md): design decisions and coding conventions
+- [docs/changelog.md](docs/changelog.md): implemented features and notable changes
+- [docs/requirements.md](docs/requirements.md): pending requirements
+- [docs/specs/](docs/specs/): archived feature and restructuring designs
 
 ## License
 
