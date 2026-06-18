@@ -25,9 +25,9 @@ jobs:
             cd ~/MarkVault
             git pull origin main
             
-            # 激活虚拟环境并安装可能的依赖更新
-            cd server_flask
+            # 激活虚拟环境并安装可能的依赖更新 (虚拟环境在根目录)
             source .venv/bin/activate
+            cd server_flask
             pip install -r requirements.txt
             
             # 重启 systemd 后端服务 (使用用户级 systemd，无需 sudo)

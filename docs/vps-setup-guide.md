@@ -41,9 +41,10 @@ git clone git@github.com:你的用户名/blog-content.git content
 ## 3. Python 虚拟环境与依赖
 
 ```bash
-cd ~/MarkVault/server_flask
-python3 -m venv .venv
+cd ~/MarkVault
+python3 -m venv .venv  # 或者使用你的 uv: uv venv .venv
 source .venv/bin/activate
+cd server_flask
 pip install -r requirements.txt
 pip install gunicorn  # 安装生产环境的 WSGI 服务器
 ```
@@ -72,9 +73,9 @@ After=network.target
 [Service]
 # 注意：用户级 systemd 默认就是以当前用户运行，所以无需配置 User 和 Group
 WorkingDirectory=%h/MarkVault/server_flask
-Environment="PATH=%h/MarkVault/server_flask/.venv/bin"
+Environment="PATH=%h/MarkVault/.venv/bin"
 # 为了方便 Nginx 代理，绑定到本地的 8000 端口
-ExecStart=%h/MarkVault/server_flask/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
+ExecStart=%h/MarkVault/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
 
 [Install]
 WantedBy=default.target
