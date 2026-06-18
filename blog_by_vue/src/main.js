@@ -7,6 +7,11 @@ import router from './router'
 import axios from 'axios'
 import { useAuth } from './composables/useAuth'
 
+// 配置后端的 API 基础路径，生产环境由 Cloudflare Pages 提供环境变量
+if (import.meta.env.VITE_API_BASE_URL) {
+  axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
+}
+
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('markvault_jwt');
   if (token) {
