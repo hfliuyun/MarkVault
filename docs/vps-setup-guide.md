@@ -1,0 +1,134 @@
+# MarkVault 后端 VPS (Fedora) 部署指南
+
+这是一份为你准备的 DMIT VPS (Fedora 发行版) 一键/分布执行脚本指南。假设你已经 SSH 登录到了你的 VPS 上（建议使用 `root` 或带有 `sudo` 权限的用户）。
+
+## 1. 基础环境安装
+首先更新系统并安装必备软件：Python 3、Nginx、Git。
+
+```bash
+sudo dnf update -y
+sudo dnf install -y python3 python3-pip nginx git
+```
+
+## 2. 克隆代码仓库
+
+为了让 GitHub Actions 能够顺利 SSH 并拉取代码，我们使用 HTTPS 结合 GitHub Personal Access Token (PAT) 或是配置 VPS 的 SSH 密钥。推荐配置 SSH 密钥：
+
+```bash
+# 在 VPS 上生成 SSH 密钥，一路回车
+ssh-keygen -t ed25519 -C "your_email@example.com"
+
+# 查看公钥，将其复制并添加到你 GitHub 账号的 SSH Keys 中
+cat ~/.ssh/id_ed25519.pub
+```
+
+确保添加公钥后，克隆仓库：
+
+```bash
+# 进入主目录
+cd ~
+
+# 1. 克隆后端公开代码仓库
+git clone git@github.com:你的用户名/MarkVault.git
+
+# 2. 克隆你的私有内容仓库（存放在 MarkVault 的 content 目录下）
+# 先确保把原来的 symlink 删掉或者直接 clone 进去
+cd ~/MarkVault
+rm -rf content
+git clone git@github.com:你的用户名/blog-content.git content
+```
+
+## 3. Python 虚拟环境与依赖
+
+```bash
+cd ~/MarkVault/server_flask
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install gunicorn  # 安装生产环境的 WSGI 服务器
+```
+
+## 4. 配置 Systemd 守护进程
+
+我们使用 systemd 来保证 Flask 挂掉后能自动重启，并且随系统开机启动。
+
+创建服务文件：
+```bash
+sudo nano /etc/systemd/system/markvault-backend.service
+```
+
+将以下内容粘贴进去（注意替换 `your_username` 为你实际的 Linux 用户名，如果是 root 就是 root）：
+```ini
+[Unit]
+Description=Gunicorn instance to serve MarkVault Backend
+After=network.target
+
+[Service]
+User=your_username
+Group=nginx
+WorkingDirectory=/home/your_username/MarkVault/server_flask
+Environment="PATH=/home/your_username/MarkVault/server_flask/.venv/bin"
+# 为了方便 Nginx 代理，绑定到本地的 8000 端口
+ExecStart=/home/your_username/MarkVault/server_flask/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启动并激活服务：
+```bash
+sudo systemctl start markvault-backend
+sudo systemctl enable markvault-backend
+```
+
+## 5. 配置 Nginx 反向代理
+
+接下来配置 Nginx，拦截 `api.yourdomain.com` 并转给 Flask。
+Fedora 的 Nginx 配置文件默认放在 `/etc/nginx/conf.d/` 下。
+
+```bash
+sudo nano /etc/nginx/conf.d/markvault-api.conf
+```
+
+粘贴以下内容：
+```nginx
+server {
+    listen 80;
+    server_name api.yourdomain.com; # 替换为你的真实 API 域名
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+测试配置并启动 Nginx：
+```bash
+sudo nginx -t
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+## 6. 申请免费 SSL 证书 (HTTPS)
+
+安装 Certbot：
+```bash
+sudo dnf install -y certbot python3-certbot-nginx
+```
+
+申请证书（Certbot 会自动修改 Nginx 配置文件添加 SSL）：
+```bash
+sudo certbot --nginx -d api.yourdomain.com
+```
+
+## 🎉 完成！
+
+至此，你的 VPS 已经完美就绪：
+- 后端跑在 `127.0.0.1:8000`。
+- Nginx 监听公网 HTTPS 并安全转发。
+- Cloudflare Pages 上的前端通过配置 `VITE_API_BASE_URL=https://api.yourdomain.com` 即可连通！
+- 每次你在本地推送代码或文章，GitHub Actions 会自动执行 `git pull` 和 `sudo systemctl restart markvault-backend`！
