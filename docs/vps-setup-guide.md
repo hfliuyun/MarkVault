@@ -48,37 +48,43 @@ pip install -r requirements.txt
 pip install gunicorn  # 安装生产环境的 WSGI 服务器
 ```
 
-## 4. 配置 Systemd 守护进程
+## 4. 配置 Systemd 守护进程 (用户级，免 sudo)
 
-我们使用 systemd 来保证 Flask 挂掉后能自动重启，并且随系统开机启动。
+为了让你当前的非 root 用户（比如 `aa`）能够安全地在自动化部署时管理进程，并且不需要输入 `sudo` 密码，我们采用**用户级 systemd**。
 
-创建服务文件：
+首先，开启该用户的驻留权限，确保即使退出 SSH 后进程也能一直在后台跑（这一步需要用到 sudo）：
 ```bash
-sudo nano /etc/systemd/system/markvault-backend.service
+sudo loginctl enable-linger $USER
 ```
 
-将以下内容粘贴进去（注意替换 `your_username` 为你实际的 Linux 用户名，如果是 root 就是 root）：
+接着，创建用户级别的 systemd 目录和服务文件：
+```bash
+mkdir -p ~/.config/systemd/user
+nano ~/.config/systemd/user/markvault-backend.service
+```
+
+将以下内容粘贴进去：
 ```ini
 [Unit]
 Description=Gunicorn instance to serve MarkVault Backend
 After=network.target
 
 [Service]
-User=your_username
-Group=nginx
-WorkingDirectory=/home/your_username/MarkVault/server_flask
-Environment="PATH=/home/your_username/MarkVault/server_flask/.venv/bin"
+# 注意：用户级 systemd 默认就是以当前用户运行，所以无需配置 User 和 Group
+WorkingDirectory=%h/MarkVault/server_flask
+Environment="PATH=%h/MarkVault/server_flask/.venv/bin"
 # 为了方便 Nginx 代理，绑定到本地的 8000 端口
-ExecStart=/home/your_username/MarkVault/server_flask/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
+ExecStart=%h/MarkVault/server_flask/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 ```
 
-启动并激活服务：
+加载配置、启动并激活服务（注意不要加 `sudo`）：
 ```bash
-sudo systemctl start markvault-backend
-sudo systemctl enable markvault-backend
+systemctl --user daemon-reload
+systemctl --user start markvault-backend
+systemctl --user enable markvault-backend
 ```
 
 ## 5. 配置 Nginx 反向代理

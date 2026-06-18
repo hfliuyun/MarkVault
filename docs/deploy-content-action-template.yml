@@ -25,6 +25,6 @@ jobs:
             cd ~/MarkVault/content
             git pull origin main || git pull origin master
             
-            # 重启后端服务，触发重建文章索引
-            sudo systemctl restart markvault-backend
+            # 重启后端服务，触发重建文章索引 (使用用户级 systemd，无需 sudo)
+            systemctl --user restart markvault-backend
             echo "Content synced and backend restarted to index new articles."
