@@ -107,6 +107,7 @@ class NotionSyncService:
             raise NotionAPIError(f"Failed to update page {page_id}: {resp.text}")
 
     def clear_page_blocks(self, page_id: str) -> None:
+        block_ids = []
         has_more = True
         next_cursor = None
         while has_more:
@@ -119,13 +120,14 @@ class NotionSyncService:
                 break
             data = resp.json()
             for block in data.get("results", []):
-                block_id = block["id"]
-                del_resp = requests.delete(f"{NOTION_API_URL}/blocks/{block_id}", headers=self.headers)
-                if del_resp.status_code != 200:
-                    print(f"Failed to delete block {block_id}: {del_resp.text}")
-            
+                block_ids.append(block["id"])
             has_more = data.get("has_more", False)
             next_cursor = data.get("next_cursor")
+            
+        for block_id in block_ids:
+            del_resp = requests.delete(f"{NOTION_API_URL}/blocks/{block_id}", headers=self.headers)
+            if del_resp.status_code != 200:
+                print(f"Failed to delete block {block_id}: {del_resp.text}")
 
     def append_page_blocks(self, page_id: str, children: list) -> None:
         if not children:
