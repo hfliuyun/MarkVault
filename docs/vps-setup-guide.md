@@ -79,6 +79,10 @@ Environment="PATH=%h/MarkVault/.venv/bin"
 # Environment="CLOUDFLARE_ZONE_ID=你的_Zone_ID"
 # Environment="CLOUDFLARE_API_TOKEN=你的_API_Token"
 
+# 如果你希望在后端配置与 Notion 数据库的同步功能，请取消下面两行的注释并填入你的配置：
+# Environment="NOTION_API_TOKEN=你的_Notion_Integration_Token"
+# Environment="NOTION_DATABASE_ID=你的_Notion_Database_ID"
+
 # 为了方便 Nginx 代理，绑定到本地的 8000 端口
 ExecStart=%h/MarkVault/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
 

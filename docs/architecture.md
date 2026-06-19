@@ -127,3 +127,6 @@ Vue 前端位于 `blog_by_vue/`：
 - SQLite 缓存
 - 搜索索引
 - Markdown 到 Notion 的单向同步
+
+## Notion Sync 架构
+同步机制 (`notion_sync.py`) 使用 `mistletoe` AST 解析器提取 Markdown 抽象语法树，遍历生成原生 Notion Blocks。为了保证高效的远程 API 同步，避免因 `git` 操作刷新 `mtime` 而引发的误判，脚本采用 **MD5 内容指纹 (Hash)** 缓存策略。这与本地服务器热重载使用的基于文件系统的 `stat` 策略（注重内存响应效率）形成对比。

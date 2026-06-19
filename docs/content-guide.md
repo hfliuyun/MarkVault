@@ -202,3 +202,12 @@ Markdown 中使用相对路径：
 - 发布后保持稳定。
 - 不要从可变标题自动生成最终 slug。
 - 规范文章 URL 为 `/posts/:slug`。
+
+## 7. 同步到 Notion (Notion Sync)
+系统提供了单向同步工具，将本地 Markdown 文章发布到 Notion 数据库以供阅读。
+- **增量更新**: 基于正文和元数据的 MD5 Hash 指纹，跳过未修改的文章。
+- **自动图片上传**: 检测到本地图片时，自动调用 Notion File Upload API 将二进制上传到 Notion 并在页面内呈现为原生 Image 区块。
+- **命令执行**: 
+  ```bash
+  python3 manage.py notion_sync
+  ```
