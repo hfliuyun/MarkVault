@@ -75,7 +75,7 @@ watch(() => props.article.slug, closeDrawer);
       class="post-sidebar-drawer"
       title="文章导航"
       direction="ltr"
-      size="min(86vw, 360px)"
+      size="min(80vw, 320px)"
     >
       <PostSidebarContent
         :article="article"
@@ -188,6 +188,22 @@ watch(() => props.article.slug, closeDrawer);
 
   .mobile-sidebar-button:hover {
     color: var(--blog-accent);
+  }
+
+  .post-sidebar-drawer {
+    margin: 12px !important;
+    height: calc(100vh - 24px) !important;
+    border-radius: var(--radius-lg) !important;
+    border: 1px solid var(--glass-border-tl) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(24px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+    box-shadow: var(--glass-shadow) !important;
+  }
+
+  [data-theme='dark'] .post-sidebar-drawer {
+    background: rgba(20, 20, 25, 0.72) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
 
   .post-sidebar-drawer .el-drawer__header {
