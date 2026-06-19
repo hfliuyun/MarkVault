@@ -59,7 +59,9 @@ class ContentIndex:
         
         # Always purge cache on reload (both initial startup and hot-reloads)
         from app.services.cloudflare import purge_cache_async
+        from app.services.notion_sync import sync_local_to_notion_async
         purge_cache_async()
+        sync_local_to_notion_async(self.content_root)
             
         self.content_signature = content_signature
 

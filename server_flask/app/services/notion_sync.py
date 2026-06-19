@@ -157,7 +157,34 @@ def get_content_hash(metadata: dict, content: str) -> str:
     raw = json.dumps(meta_subset, sort_keys=True) + "\n---\n" + content
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
+
+import threading
+import os
+
+_sync_lock = threading.Lock()
+
+def sync_local_to_notion_async(content_root: Path):
+    token = os.environ.get("NOTION_API_TOKEN")
+    database_id = os.environ.get("NOTION_DATABASE_ID")
+    if not token or not database_id:
+        return
+
+    def _run_sync():
+        if not _sync_lock.acquire(blocking=False):
+            # A sync is already running, skip this trigger.
+            # Next time mtime changes, it will trigger again.
+            return
+        try:
+            sync_local_to_notion(content_root, token, database_id)
+        finally:
+            _sync_lock.release()
+
+    thread = threading.Thread(target=_run_sync)
+    thread.daemon = True
+    thread.start()
+
 def sync_local_to_notion(content_root: Path, token: str, database_id: str):
+
     service = NotionSyncService(token, database_id)
     
     files = list(content_root.glob("posts/*/index.md")) + list(content_root.glob("series/*/*/index.md"))
