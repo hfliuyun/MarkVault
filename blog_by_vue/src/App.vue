@@ -31,6 +31,12 @@ import PageHeader from './components/PageHeader.vue';
   padding: 100px 20px 60px; /* Top padding to prevent overlap with fixed header */
 }
 
+@media (max-width: 960px) {
+  .main-content {
+    padding: 88px 0px 40px;
+  }
+}
+
 /* Page Transition Animations */
 .fade-page-enter-active,
 .fade-page-leave-active {

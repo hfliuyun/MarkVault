@@ -65,7 +65,7 @@ defineProps({
 
 @media (max-width: 960px) {
   .post-page-container {
-    padding: 0 12px 30px;
+    padding: 0 8px 24px;
   }
 
   .post-layout {
@@ -75,7 +75,7 @@ defineProps({
   }
 
   .post-content-card {
-    padding: 24px 20px;
+    padding: 20px 14px;
   }
 }
 
