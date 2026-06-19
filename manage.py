@@ -22,6 +22,9 @@ from app.services.auth import (  # noqa: E402
     generate_totp_secret,
     get_provisioning_uri,
 )
+import os
+from dotenv import load_dotenv
+from app.services.notion_sync import sync_local_to_notion
 
 
 def main() -> int:
@@ -34,6 +37,8 @@ def main() -> int:
         return handle_setup_totp(account=args.account)
     if args.command == "reset_totp":
         return handle_reset_totp(account=args.account)
+    if args.command == "notion_sync":
+        return handle_notion_sync(args)
 
     parser.print_help()
     return 1
@@ -99,6 +104,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="admin",
         help="Account name embedded in the provisioning URI.",
     )
+    
+    notion_sync = subparsers.add_parser(
+        "notion_sync",
+        help="Sync local markdown posts to Notion Database.",
+    )
+    notion_sync.add_argument(
+        "--content-root",
+        type=Path,
+        help="Content root. Defaults to BLOG_CONTENT_ROOT or ./content.",
+    )
     return parser
 
 
@@ -158,6 +173,23 @@ def handle_reset_totp(account: str = "admin") -> int:
         TOTP_SECRET_PATH.unlink()
     AUTH_DIR.mkdir(parents=True, exist_ok=True)
     return handle_setup_totp(account=account)
+
+
+def handle_notion_sync(args: argparse.Namespace) -> int:
+    load_dotenv()
+    token = os.environ.get("NOTION_API_TOKEN")
+    database_id = os.environ.get("NOTION_DATABASE_ID")
+    
+    if not token or not database_id:
+        print("error: NOTION_API_TOKEN and NOTION_DATABASE_ID must be set in env", file=sys.stderr)
+        return 2
+        
+    content_root = args.content_root or Path(os.environ.get("BLOG_CONTENT_ROOT", "./content"))
+    
+    print(f"Starting Notion Sync from {content_root}...")
+    sync_local_to_notion(content_root, token, database_id)
+    print("Sync complete.")
+    return 0
 
 
 if __name__ == "__main__":
