@@ -64,7 +64,7 @@ mkdir -p ~/.config/systemd/user
 nano ~/.config/systemd/user/markvault-backend.service
 ```
 
-将以下内容粘贴进去：
+将以下内容粘贴进去（注意如果你启用了自动清理 Cloudflare 缓存，请把你的 API 配置写进去）：
 ```ini
 [Unit]
 Description=Gunicorn instance to serve MarkVault Backend
@@ -74,6 +74,11 @@ After=network.target
 # 注意：用户级 systemd 默认就是以当前用户运行，所以无需配置 User 和 Group
 WorkingDirectory=%h/MarkVault/server_flask
 Environment="PATH=%h/MarkVault/.venv/bin"
+
+# 如果你希望后端在文章更新时自动清理 Cloudflare 缓存，请取消下面两行的注释并填入你的配置：
+# Environment="CLOUDFLARE_ZONE_ID=你的_Zone_ID"
+# Environment="CLOUDFLARE_API_TOKEN=你的_API_Token"
+
 # 为了方便 Nginx 代理，绑定到本地的 8000 端口
 ExecStart=%h/MarkVault/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 run:app
 

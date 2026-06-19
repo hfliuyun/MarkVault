@@ -56,6 +56,11 @@ class ContentIndex:
         self.categories = self._build_taxonomy_index(posts, "categories")
         self.tags = self._build_taxonomy_index(posts, "tags")
         self.legacy_redirects = self._build_legacy_redirects(posts)
+        
+        # Always purge cache on reload (both initial startup and hot-reloads)
+        from app.services.cloudflare import purge_cache_async
+        purge_cache_async()
+            
         self.content_signature = content_signature
 
     def reload_if_changed(self) -> None:
