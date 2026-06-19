@@ -139,3 +139,20 @@ sudo certbot --nginx -d api.yourdomain.com
 - Nginx 监听公网 HTTPS 并安全转发。
 - Cloudflare Pages 上的前端通过配置 `VITE_API_BASE_URL=https://api.yourdomain.com` 即可连通！
 - 每次你在本地推送代码或文章，GitHub Actions 会自动执行 `git pull` 和 `sudo systemctl restart markvault-backend`！
+
+## 7. 配置 Cloudflare API 边缘缓存 (极致加速)
+
+为了让前端的分类、标签和文章列表响应速度达到毫秒级，建议在 Cloudflare 层面配置静态 API 的缓存（拦截向 VPS 的动态请求）。
+
+1. 登录 Cloudflare，进入你的前端域名管理页面。
+2. 左侧菜单找到 **Cache (缓存)** -> **Cache Rules (缓存规则)**。
+3. 点击 **Create rule (创建规则)**，命名为 `API Cache`。
+4. **匹配条件 (When incoming requests match)**：
+   * Field (字段): `URI Path`
+   * Operator (运算符): `starts with`
+   * Value (值): `/api/`
+5. **缓存设置 (Cache eligibility)**：
+   * 选择 **Eligible for cache (符合缓存条件)**。
+   * **Edge TTL (边缘 TTL)**: 选择 `Override origin`，并设置为 `2 hours`（此时间内全球请求全部命中边缘节点，彻底屏蔽回源请求）。
+   * **Browser TTL (浏览器 TTL)**: 选择 `Override origin`，设置为 `10 minutes`。
+6. 点击 **Deploy (部署)**，完成！此时访问页面的 API 请求延迟将大幅下降至 ~10ms。

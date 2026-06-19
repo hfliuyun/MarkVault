@@ -19,4 +19,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router'],
+          'element-plus': ['element-plus', '@element-plus/icons-vue'],
+          'katex': ['katex'],
+          'highlight': ['highlight.js'],
+          'md-editor': ['md-editor-v3'],
+          'marked': ['marked', 'marked-highlight']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000,
+  }
 })
