@@ -381,12 +381,19 @@ def sync_local_to_notion(
                 post.metadata["notion"] = {"page_id": page_id}
                 fm_modified = True
 
-            # Step 10: Record sync state
-            notion_let = resp_data.get("last_edited_time", "")
-            if not notion_let:
-                # Fetch fresh if not in response
-                page_info = service.get_page_info(page_id)
-                notion_let = page_info.get("last_edited_time", "") if page_info else ""
+            # Step 10: Record sync state.
+            # Re-fetch AFTER all writes: on the update path, clear_page_blocks +
+            # append_page_blocks advance Notion's last_edited_time past what the
+            # update_page/create_page response captured. Recording the stale
+            # response value would make the next sync see a self-inflicted
+            # mismatch and falsely report a conflict. Fall back to resp_data only
+            # if the post-write fetch fails.
+            page_info = service.get_page_info(page_id)
+            notion_let = (
+                page_info.get("last_edited_time", "")
+                if page_info
+                else resp_data.get("last_edited_time", "")
+            )
 
             sync_state.record_sync(
                 file_key,
