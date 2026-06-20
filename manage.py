@@ -114,6 +114,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Content root. Defaults to BLOG_CONTENT_ROOT or ./content.",
     )
+    notion_sync.add_argument(
+        "--no-cooldown",
+        action="store_true",
+        help="Skip debounce delay, sync immediately.",
+    )
+    notion_sync.add_argument(
+        "--force-overwrite",
+        action="store_true",
+        help="Overwrite Notion pages even if edited since last sync.",
+    )
     return parser
 
 
@@ -187,7 +197,12 @@ def handle_notion_sync(args: argparse.Namespace) -> int:
     content_root = args.content_root or Path(os.environ.get("BLOG_CONTENT_ROOT", "./content"))
     
     print(f"Starting Notion Sync from {content_root}...")
-    sync_local_to_notion(content_root, token, database_id)
+    sync_local_to_notion(
+        content_root,
+        token,
+        database_id,
+        force_overwrite=args.force_overwrite,
+    )
     print("Sync complete.")
     return 0
 
