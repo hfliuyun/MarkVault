@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 import threading
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -289,7 +288,6 @@ def sync_local_to_notion(
             title = metadata.get("title", "Untitled")
 
             # Step 6: Conflict / adopt check for existing pages
-            do_body_sync = True
             if page_id:
                 recorded_let = state.get("notion_last_edited_time")
                 if recorded_let:

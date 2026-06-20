@@ -1,20 +1,16 @@
-import json
 import tempfile
-import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import frontmatter
 
 from app.services.notion_sync import (
-    NotionSyncService,
     get_content_hash,
     migrate_frontmatter,
     sync_local_to_notion,
 )
 from app.services.notion_sync_state import NotionSyncState
-from app.services.notion_image_cache import NotionImageCache
 
 
 class TestGetContentHash(unittest.TestCase):
