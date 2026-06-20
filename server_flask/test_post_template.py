@@ -35,7 +35,7 @@ class PostTemplateTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEqual(generated.index_path, self.content_root / "posts/new-post/index.md")
+        self.assertEqual(generated.index_path.resolve(), (self.content_root / "posts/new-post/index.md").resolve())
         self.assertTrue(generated.images_dir.is_dir())
 
         index = ContentIndex(self.content_root)
