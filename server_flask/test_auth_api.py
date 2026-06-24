@@ -39,17 +39,20 @@ class AuthApiTestCase(unittest.TestCase):
             os.environ["JWT_SECRET"] = self.previous_jwt_secret
         self.temp_dir.cleanup()
 
-    def test_provisioning_uri_requires_authentication(self):
+    def test_provisioning_uri_endpoint_is_not_exposed(self):
         response = self.client.get("/api/auth/provisioning-uri")
 
-        self.assertEqual(response.status_code, 401)
-        self.assertNotIn("uri", response.get_json())
+        self.assertEqual(response.status_code, 404)
 
-    def test_authenticated_admin_can_fetch_provisioning_uri(self):
+    def test_authenticated_admin_cannot_fetch_provisioning_uri_over_http(self):
         response = self.client.get("/api/auth/provisioning-uri", headers=self.auth_headers)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("otpauth://totp/MarkVault:admin", response.get_json()["uri"])
+        self.assertEqual(response.status_code, 404)
+
+    def test_provisioning_uri_helper_still_supports_terminal_setup(self):
+        uri = auth.get_provisioning_uri(account_name="admin")
+
+        self.assertIn("otpauth://totp/MarkVault:admin", uri)
 
 
 if __name__ == "__main__":
