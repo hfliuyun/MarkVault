@@ -9,8 +9,3 @@ export async function checkAuthStatus() {
   const response = await axios.get('/api/auth/status');
   return response.data;
 }
-
-export async function getAuthProvisioningUri() {
-  const response = await axios.get('/api/auth/provisioning-uri');
-  return response.data;
-}

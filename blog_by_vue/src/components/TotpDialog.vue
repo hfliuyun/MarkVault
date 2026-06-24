@@ -1,7 +1,5 @@
 <script setup>
-import { ElMessage } from 'element-plus';
 import { computed, nextTick, ref, watch } from 'vue';
-import { getAuthProvisioningUri } from '@/api/auth';
 import { useAuth } from '@/composables/useAuth';
 
 const props = defineProps({
@@ -18,9 +16,6 @@ const inputs = ref(Array.from({ length: 6 }, () => ''));
 const inputRefs = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
-const setupLoading = ref(false);
-const provisioningUri = ref('');
-const setupError = ref('');
 
 const code = computed(() => inputs.value.join(''));
 
@@ -35,26 +30,11 @@ const reset = async () => {
   await focusInput(0);
 };
 
-const loadSetupInfo = async () => {
-  setupLoading.value = true;
-  setupError.value = '';
-  provisioningUri.value = '';
-  try {
-    const data = await getAuthProvisioningUri();
-    provisioningUri.value = data.uri || '';
-  } catch (error) {
-    setupError.value = error.response?.data?.error || '当前还没有初始化 TOTP。';
-  } finally {
-    setupLoading.value = false;
-  }
-};
-
 watch(
   () => props.visible,
   async (visible) => {
     if (visible) {
       await reset();
-      await loadSetupInfo();
     }
   }
 );
@@ -105,12 +85,6 @@ const cancel = () => {
   emit('update:visible', false);
 };
 
-const copySetupUri = async () => {
-  if (!provisioningUri.value) return;
-  await navigator.clipboard.writeText(provisioningUri.value);
-  ElMessage.success('绑定链接已复制');
-};
-
 defineExpose({ submit });
 </script>
 
@@ -129,14 +103,8 @@ defineExpose({ submit });
         <p>
           先在服务器终端执行
           <code>python manage.py setup_totp --account admin</code>
-          ，再用 Authenticator 扫描二维码，或手动输入输出的密钥。
+          ，再用 Authenticator 扫描终端二维码，或手动输入终端输出的密钥。
         </p>
-        <p v-if="setupError" class="totp-setup-error">{{ setupError }}</p>
-        <div v-else-if="setupLoading" class="totp-setup-state">正在加载绑定信息...</div>
-        <div v-else-if="provisioningUri" class="totp-setup-uri">
-          <span>已配置绑定信息，可复制 otpauth 链接做手动导入。</span>
-          <button type="button" class="totp-copy-btn" @click="copySetupUri">复制绑定链接</button>
-        </div>
       </section>
 
       <p class="totp-hint">绑定完成后，再输入 6 位动态验证码完成登录。</p>
@@ -201,30 +169,6 @@ defineExpose({ submit });
   border-radius: 6px;
   background: color-mix(in srgb, var(--blog-accent) 10%, transparent);
   color: var(--blog-text);
-}
-
-.totp-setup-error {
-  color: #d14343 !important;
-}
-
-.totp-setup-state {
-  color: var(--blog-muted);
-}
-
-.totp-setup-uri {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.totp-copy-btn {
-  align-self: flex-start;
-  padding: 8px 12px;
-  border: 1px solid var(--blog-border);
-  border-radius: var(--radius-sm);
-  background: var(--blog-surface);
-  color: var(--blog-text);
-  cursor: pointer;
 }
 
 .totp-inputs {
