@@ -8,6 +8,7 @@ from app.services.auth import (
     create_jwt,
     extract_bearer_token,
     get_provisioning_uri,
+    require_auth,
     verify_jwt,
     verify_totp,
 )
@@ -35,6 +36,7 @@ def auth_status():
 
 
 @api_bp.route('/auth/provisioning-uri', methods=['GET'])
+@require_auth
 def auth_provisioning_uri():
     try:
         return jsonify({"uri": get_provisioning_uri()})
