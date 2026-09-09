@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import io
+
 from flask import current_app, jsonify, request, send_file
+from werkzeug.datastructures import FileStorage
 
 from . import api_bp
 from app.api.routes import content_error_response, get_content_index
@@ -72,13 +75,24 @@ def download_template():
 @api_bp.route('/posts/upload', methods=['POST'])
 @require_auth
 def upload_post():
-    if "file" not in request.files:
+    # Multipart form (browser) or raw application/zip body (script/plugin).
+    if request.content_type and request.content_type.startswith("application/zip"):
+        raw = request.get_data()
+        if not raw:
+            return jsonify({"error": "No file provided."}), 400
+        file_storage = FileStorage(
+            stream=io.BytesIO(raw), filename="post.zip", content_type="application/zip"
+        )
+        overwrite = request.args.get("overwrite", "false").lower() == "true"
+    elif "file" in request.files:
+        file_storage = request.files["file"]
+        overwrite = request.form.get("overwrite", "false").lower() == "true"
+    else:
         return jsonify({"error": "No file provided."}), 400
-    overwrite = request.form.get("overwrite", "false").lower() == "true"
 
     try:
         result = post_manager.process_upload(
-            request.files["file"], overwrite, current_app.config["CONTENT_ROOT"]
+            file_storage, overwrite, current_app.config["CONTENT_ROOT"]
         )
     except post_manager.PostManagerError as error:
         return jsonify({"error": str(error)}), error.status_code

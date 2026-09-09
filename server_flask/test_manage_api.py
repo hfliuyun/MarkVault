@@ -364,6 +364,18 @@ class ManageRoutesTestCase(unittest.TestCase):
         self.assertEqual(self.upload(entries, overwrite="false").status_code, 409)
         self.assertEqual(self.upload(entries, overwrite="true").status_code, 201)
 
+    def test_upload_accepts_raw_zip_body(self):
+        buf = make_zip({"raw-post/raw-post.md": index_md("Raw Post", "raw-post")})
+        response = self.client.post(
+            "/api/posts/upload?overwrite=false",
+            data=buf.getvalue(),
+            content_type="application/zip",
+            headers=self.auth,
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()["slug"], "raw-post")
+        self.assertTrue((self.content_root / "posts" / "raw-post" / "raw-post.md").is_file())
+
     def test_upload_rejects_zip_slip(self):
         response = self.upload({"../evil.md": "pwned"})
         self.assertEqual(response.status_code, 400)
