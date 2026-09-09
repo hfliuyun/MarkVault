@@ -2,6 +2,7 @@
 
 :root {
   /* Default to light mode */
+  color-scheme: light;
   --blog-bg: #f3f3f3; 
   /* Extremely transparent base */
   --blog-surface: rgba(255, 255, 255, 0.1); 
@@ -29,6 +30,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --blog-bg: #0b0c10;
   --blog-surface: rgba(0, 0, 0, 0.1); 
   --blog-surface-hover: rgba(0, 0, 0, 0.2);

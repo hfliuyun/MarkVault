@@ -143,25 +143,31 @@ onMounted(async () => {
         </div>
 
         <div class="paste-toolbar">
-          <label class="select-field">
+          <div class="select-field">
             <span>语言</span>
-            <select v-model="form.language">
-              <option v-for="language in languageOptions" :key="language" :value="language">
-                {{ language }}
-              </option>
-            </select>
-          </label>
+            <el-select v-model="form.language" aria-label="语言" placeholder="选择语言" size="large">
+              <el-option
+                v-for="language in languageOptions"
+                :key="language"
+                :label="language"
+                :value="language"
+              />
+            </el-select>
+          </div>
 
-          <label class="select-field">
+          <div class="select-field">
             <span>过期</span>
-            <select v-model="form.expires_in">
-              <option v-for="option in expiryOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
+            <el-select v-model="form.expires_in" aria-label="过期时间" placeholder="选择时间" size="large">
+              <el-option
+                v-for="option in expiryOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+          </div>
 
-          <el-button type="primary" native-type="submit" :loading="creating" :disabled="!canCreate">
+          <el-button type="primary" native-type="submit" :loading="creating" :disabled="!canCreate" size="large">
             <el-icon><Plus /></el-icon>
             创建 Paste
           </el-button>
@@ -258,8 +264,7 @@ onMounted(async () => {
 }
 
 .paste-input,
-.paste-textarea,
-.select-field select {
+.paste-textarea {
   border: 1px solid var(--blog-border);
   border-radius: var(--radius-md);
   background: var(--blog-surface);
@@ -267,8 +272,7 @@ onMounted(async () => {
   outline: none;
 }
 
-.paste-input,
-.select-field select {
+.paste-input {
   height: 42px;
   padding: 0 12px;
 }
@@ -293,6 +297,10 @@ onMounted(async () => {
   flex-direction: column;
   gap: 8px;
   min-width: 140px;
+}
+
+.select-field :deep(.el-select) {
+  width: 100%;
 }
 
 .created-tip {
