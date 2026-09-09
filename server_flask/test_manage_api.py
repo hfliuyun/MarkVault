@@ -86,15 +86,15 @@ class PostManagerServiceTestCase(unittest.TestCase):
 
     # --- build_template_zip ---
 
-    def test_build_template_zip_contains_index_and_images_dir(self):
+    def test_build_template_zip_contains_markdown_and_images_dir(self):
         buf = build_template_zip(
             NewPostOptions(title="Logistic Regression", slug="logistic-regression", tags=("algo",))
         )
         with zipfile.ZipFile(buf) as zf:
             names = zf.namelist()
-            body = zf.read("logistic-regression/index.md").decode("utf-8")
+            body = zf.read("logistic-regression/logistic-regression.md").decode("utf-8")
 
-        self.assertIn("logistic-regression/index.md", names)
+        self.assertIn("logistic-regression/logistic-regression.md", names)
         self.assertIn("logistic-regression/images/", names)
         self.assertIn("title:", body)
         self.assertIn("slug:", body)
@@ -157,6 +157,26 @@ class PostManagerServiceTestCase(unittest.TestCase):
         )
         self.assertEqual(result["slug"], "flat-post")
         self.assertTrue((self.content_root / "posts" / "flat-post" / "index.md").is_file())
+
+    def test_process_upload_accepts_slug_named_markdown(self):
+        result = process_upload(
+            zip_storage({"my-post/my-post.md": index_md("My Post", "my-post")}),
+            overwrite=False,
+            content_root=self.content_root,
+        )
+        self.assertEqual(result["slug"], "my-post")
+        self.assertTrue((self.content_root / "posts" / "my-post" / "my-post.md").is_file())
+
+        index = ContentIndex(self.content_root)
+        self.assertIn("my-post", index.posts_by_slug)
+
+    def test_process_upload_rejects_ambiguous_markdown_naming(self):
+        entries = {
+            "my-post/index.md": index_md("My Post", "my-post"),
+            "my-post/my-post.md": index_md("My Post", "my-post"),
+        }
+        with self.assertRaisesRegex(PostManagerError, "keep only one"):
+            process_upload(zip_storage(entries), overwrite=False, content_root=self.content_root)
 
     def test_process_upload_rejects_non_zip(self):
         with self.assertRaisesRegex(PostManagerError, "zip"):
@@ -315,7 +335,7 @@ class ManageRoutesTestCase(unittest.TestCase):
         self.assertEqual(response.mimetype, "application/zip")
         self.assertIn("test-post.zip", response.headers.get("Content-Disposition", ""))
         with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
-            self.assertIn("test-post/index.md", zf.namelist())
+            self.assertIn("test-post/test-post.md", zf.namelist())
 
     def test_download_template_rejects_missing_slug(self):
         response = self.client.post("/api/posts/template", json={"title": "X"}, headers=self.auth)

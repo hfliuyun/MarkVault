@@ -26,6 +26,7 @@ class ContentIndexTestCase(unittest.TestCase):
         extra_frontmatter="",
         categories=None,
         tags=None,
+        filename="index.md",
     ):
         post_dir = self.content_root / relative_dir
         post_dir.mkdir(parents=True, exist_ok=True)
@@ -43,8 +44,8 @@ tags:
 {tag_lines}
 {extra_frontmatter}---
 """
-        (post_dir / "index.md").write_text(frontmatter + body, encoding="utf-8")
-        return post_dir / "index.md"
+        (post_dir / filename).write_text(frontmatter + body, encoding="utf-8")
+        return post_dir / filename
 
     def write_series_readme(self, series_id, body="", title=None):
         series_dir = self.content_root / "series" / series_id
@@ -239,6 +240,62 @@ tags:
         )
 
         with self.assertRaisesRegex(ContentIndexError, "Duplicate slug 'same-slug'"):
+            ContentIndex(self.content_root)
+
+    def test_slug_named_markdown_is_discovered(self):
+        self.write_post(
+            "posts/git-basic",
+            "Git Basic",
+            "git-basic",
+            "2024-01-01",
+            filename="git-basic.md",
+        )
+        self.write_post(
+            "series/ml-basic/logistic-regression",
+            "Logistic Regression",
+            "logistic-regression",
+            "2024-01-02",
+            filename="logistic-regression.md",
+            extra_frontmatter="""series:
+  id: ml-basic
+  title: ML Basic
+""",
+        )
+
+        index = ContentIndex(self.content_root)
+
+        self.assertEqual(index.list_posts(page=1, size=10)["total"], 2)
+        self.assertIn("git-basic", index.posts_by_slug)
+        self.assertIn("logistic-regression", index.posts_by_slug)
+        self.assertEqual(
+            index.get_post_image_dir("git-basic"),
+            self.content_root / "posts/git-basic/images",
+        )
+
+    def test_index_and_slug_named_markdown_conflict_raises(self):
+        post_dir = self.write_post(
+            "posts/git-basic", "Git Basic", "git-basic", "2024-01-01"
+        ).parent
+        (post_dir / "git-basic.md").write_text(
+            "---\ntitle: Dup\nslug: git-basic\ndate: 2024-01-01\n---\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ContentIndexError, "keep only one of them"):
+            ContentIndex(self.content_root)
+
+    def test_slug_named_markdown_must_match_frontmatter_slug(self):
+        self.write_post(
+            "posts/git-basic",
+            "Git Basic",
+            "other-slug",
+            "2024-01-01",
+            filename="git-basic.md",
+        )
+
+        with self.assertRaisesRegex(
+            ContentIndexError, "does not match frontmatter slug 'other-slug'"
+        ):
             ContentIndex(self.content_root)
 
     def test_series_post_image_dir_uses_actual_post_folder(self):

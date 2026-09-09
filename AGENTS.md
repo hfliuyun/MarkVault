@@ -10,7 +10,7 @@ MarkVault 是一个 Markdown 优先的个人博客 / 知识库系统，由 Vue 3
 - `docs/specs/`：功能设计和重构设计存档。
 - `manage.py`：仓库级维护命令入口。
 
-内容目录由 `BLOG_CONTENT_ROOT` 指定；未设置时默认读取仓库级 `content/`。当前索引会扫描 `content/posts/*/index.md` 和 `content/series/*/*/index.md`。系列简介可写在 `content/series/<series-id>/README.md`。
+内容目录由 `BLOG_CONTENT_ROOT` 指定；未设置时默认读取仓库级 `content/`。当前索引会扫描 `content/posts/*/` 和 `content/series/*/*/` 下的正文文件，命名支持 `index.md`（旧约定）或 `<slug>.md`（推荐，同一目录并存会报错）。系列简介可写在 `content/series/<series-id>/README.md`。
 
 运行时数据保存在 `server_flask/data/`，包括 TOTP 密钥和 Pastebin JSON 文件，不应提交到 Git。
 

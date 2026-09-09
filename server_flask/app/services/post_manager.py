@@ -36,7 +36,7 @@ class PostNotFoundError(PostManagerError):
 
 
 def build_template_zip(options: NewPostOptions) -> io.BytesIO:
-    """Build an in-memory template ZIP containing <slug>/index.md and an empty
+    """Build an in-memory template ZIP containing <slug>/<slug>.md and an empty
     <slug>/images/ directory. Mirrors create_post_template() validation without
     writing to disk."""
     title = options.title.strip()
@@ -56,7 +56,7 @@ def build_template_zip(options: NewPostOptions) -> io.BytesIO:
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{slug}/index.md", body)
+        zf.writestr(f"{slug}/{slug}.md", body)
         # Empty images/ directory. zf.mkdir() is Python 3.11+, so add a
         # trailing-slash ZipInfo entry which all unzip tools treat as a folder.
         zf.writestr(zipfile.ZipInfo(f"{slug}/images/"), "")
@@ -95,8 +95,8 @@ def process_upload(file_storage, overwrite: bool, content_root: Path) -> dict[st
         extract_root.mkdir()
         _safe_extract(zip_path, extract_root)
 
-        post_dir = _locate_post_dir(extract_root)
-        index_path = post_dir / "index.md"
+        index_path = _locate_post_markdown(extract_root)
+        post_dir = index_path.parent
         metadata = _parse_and_validate(index_path)
 
         target_dir = determine_target_dir(content_root, metadata)
@@ -145,17 +145,39 @@ def _safe_extract(zip_path: Path, extract_root: Path) -> None:
                 shutil.copyfileobj(src, out)
 
 
-def _locate_post_dir(extract_root: Path) -> Path:
-    """Find the directory containing index.md. Supports structure B (index.md at
-    the top level) and structure A (a single <slug>/index.md subdirectory)."""
-    if (extract_root / "index.md").is_file():
-        return extract_root
-    candidates = [p.parent for p in extract_root.glob("*/index.md") if p.is_file()]
+def _locate_post_markdown(extract_root: Path) -> Path:
+    """Return the post markdown file. Supports structure B (index.md at the
+    top level) and structure A (a single <slug>/ subdirectory). Within a post
+    directory the markdown may be index.md (legacy) or <directory-name>.md
+    (Obsidian-friendly); a directory containing both is an error."""
+    top_index = extract_root / "index.md"
+    if top_index.is_file():
+        return top_index
+
+    candidates: list[Path] = []
+    for child in sorted(extract_root.iterdir()):
+        if not child.is_dir():
+            continue
+        index_path = child / "index.md"
+        named_path = child / f"{child.name}.md"
+        if index_path.is_file() and named_path.is_file():
+            raise PostManagerError(
+                f"{child.name}/ contains both index.md and {named_path.name}; keep only one."
+            )
+        if index_path.is_file():
+            candidates.append(index_path)
+        elif named_path.is_file():
+            candidates.append(named_path)
+
     if len(candidates) == 1:
         return candidates[0]
     if not candidates:
-        raise PostManagerError("ZIP does not contain an index.md file.")
-    raise PostManagerError("ZIP contains multiple index.md files; cannot determine the post.")
+        raise PostManagerError(
+            "ZIP does not contain a post markdown file (index.md or <slug>/<slug>.md)."
+        )
+    raise PostManagerError(
+        "ZIP contains multiple post markdown files; cannot determine the post."
+    )
 
 
 def _parse_and_validate(index_path: Path) -> dict[str, Any]:

@@ -17,6 +17,32 @@ class ContentIndexError(RuntimeError):
     pass
 
 
+def iter_post_markdown_paths(content_root: Path) -> list[Path]:
+    """List every post markdown file under content_root.
+
+    Each post directory (posts/<slug>/ or series/<series-id>/<slug>/) holds
+    either index.md (legacy) or <directory-name>.md (Obsidian-friendly unique
+    note name). A directory containing both is an error so that edits always
+    have one authoritative file."""
+    candidates = [
+        *content_root.glob("posts/*/*.md"),
+        *content_root.glob("series/*/*/*.md"),
+    ]
+    paths: list[Path] = []
+    for post_dir in sorted({path.parent for path in candidates}):
+        index_path = post_dir / "index.md"
+        named_path = post_dir / f"{post_dir.name}.md"
+        if index_path.is_file() and named_path.is_file():
+            raise ContentIndexError(
+                f"{post_dir} contains both index.md and {named_path.name}; keep only one of them"
+            )
+        if index_path.is_file():
+            paths.append(index_path)
+        elif named_path.is_file():
+            paths.append(named_path)
+    return sorted(paths, key=str)
+
+
 @dataclass(frozen=True)
 class RenderedPost:
     metadata: dict[str, Any]
@@ -168,7 +194,7 @@ class ContentIndex:
     def _load_posts(self) -> list[Post]:
         posts: list[Post] = []
         seen_slugs: dict[str, Path] = {}
-        for index_path in self._iter_post_index_paths():
+        for index_path in iter_post_markdown_paths(self.content_root):
             post = self._load_post(index_path)
             if post.slug in seen_slugs:
                 first_path = seen_slugs[post.slug]
@@ -181,7 +207,7 @@ class ContentIndex:
 
     def _build_content_signature(self) -> tuple[tuple[str, int, int], ...]:
         signature = []
-        for index_path in self._iter_post_index_paths():
+        for index_path in iter_post_markdown_paths(self.content_root):
             stat = index_path.stat()
             signature.append(
                 (
@@ -214,13 +240,6 @@ class ContentIndex:
             stat.st_size,
         )
 
-    def _iter_post_index_paths(self) -> list[Path]:
-        paths = [
-            *self.posts_root.glob("*/index.md"),
-            *self.series_root.glob("*/*/index.md"),
-        ]
-        return sorted(paths, key=lambda path: path.relative_to(self.content_root).as_posix())
-
     def _iter_series_readme_paths(self) -> list[Path]:
         paths = [*self.series_root.glob("*/README.md")]
         return sorted(paths, key=lambda path: path.relative_to(self.content_root).as_posix())
@@ -237,6 +256,11 @@ class ContentIndex:
 
         title = str(metadata.pop("title"))
         slug = str(metadata.pop("slug"))
+        if index_path.stem != "index" and index_path.stem != slug:
+            raise ContentIndexError(
+                f"{index_path} file name does not match frontmatter slug '{slug}'."
+                " Rename the file to match the slug, use index.md, or update the frontmatter."
+            )
         date_value = self._parse_date(metadata.pop("date"), index_path)
         summary = str(metadata.pop("summary", "") or "")
         categories = self._normalize_list(metadata.pop("categories", []))

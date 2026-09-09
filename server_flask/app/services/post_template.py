@@ -32,7 +32,7 @@ class NewPostOptions:
 @dataclass(frozen=True)
 class GeneratedPost:
     post_dir: Path
-    index_path: Path
+    index_path: Path  # the post markdown file, named <slug>.md (Obsidian-friendly)
     images_dir: Path
 
 
@@ -59,7 +59,7 @@ def create_post_template(options: NewPostOptions) -> GeneratedPost:
 
     content_root = (options.content_root or default_content_root()).expanduser().resolve()
     post_dir = content_root / "posts" / slug
-    index_path = post_dir / "index.md"
+    index_path = post_dir / f"{slug}.md"
     images_dir = post_dir / "images"
 
     if post_dir.exists() or index_path.exists():

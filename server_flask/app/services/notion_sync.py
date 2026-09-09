@@ -14,6 +14,7 @@ from typing import Any
 import frontmatter
 import requests
 
+from .content_index import iter_post_markdown_paths
 from .mistletoe_notion import convert_to_notion_blocks
 from .notion_image_cache import NotionImageCache
 from .notion_sync_state import NotionSyncState
@@ -232,7 +233,7 @@ def sync_local_to_notion(
     image_cache = NotionImageCache(DATA_DIR / "notion_image_cache.json")
     sync_state = NotionSyncState(DATA_DIR / "notion_sync_state.json")
 
-    files = list(content_root.glob("posts/*/index.md")) + list(content_root.glob("series/*/*/index.md"))
+    files = iter_post_markdown_paths(content_root)
     for file_path in files:
         try:
             _sync_file(file_path, content_root, service, image_cache, sync_state, force_overwrite)

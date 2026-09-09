@@ -8,7 +8,7 @@
 
 ```text
 content/posts/logistic-regression/
-  index.md
+  logistic-regression.md
   images/
     sigmoid.png
 ```
@@ -17,7 +17,7 @@ content/posts/logistic-regression/
 
 ```text
 content/series/machine-learning-basic/logistic-regression/
-  index.md
+  logistic-regression.md
   images/
     sigmoid.png
 ```
@@ -27,6 +27,17 @@ content/series/machine-learning-basic/logistic-regression/
 ```text
 content/series/machine-learning-basic/README.md
 ```
+
+## 正文文件命名
+
+正文文件支持两种命名，二选一：
+
+- `<slug>.md`（推荐）：例如 `logistic-regression.md`。Obsidian 中每篇笔记唯一命名，快速切换（Cmd+O）和链接补全不会歧义。`manage.py new_post` 与网页模板 ZIP 均使用此命名。
+- `index.md`（旧约定）：继续支持，已有文章无需迁移。
+
+同一目录两种命名并存会被索引判定为错误。使用 `<slug>.md` 时文件名必须与 frontmatter 的 `slug` 一致。
+
+推荐配合 Obsidian 的设置：关闭 `[[Wikilinks]]`（后端只渲染标准 Markdown 链接）、新链接格式选「相对路径」、新附件位置设为「当前文件夹的子文件夹 `images`」——粘贴截图会自动落到 `images/` 并生成正确的相对路径。
 
 目录路径只用于本地组织。公开文章 URL 仍然来自 frontmatter 中的 `slug`，系列归属仍然来自 frontmatter 中的 `series` 字段。
 
