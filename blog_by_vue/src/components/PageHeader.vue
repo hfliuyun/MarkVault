@@ -324,6 +324,15 @@ onBeforeUnmount(() => {
 .nav-links {
   display: flex;
   gap: 20px;
+  /* 移动端宽度不足时导航横向滚动，而不是挤压右侧功能区 */
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav-links::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-item {
@@ -333,6 +342,8 @@ onBeforeUnmount(() => {
   font-weight: 500;
   padding: 6px 12px;
   border-radius: 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
@@ -354,6 +365,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .glass-icon-btn {
@@ -441,6 +453,10 @@ onBeforeUnmount(() => {
   
   .nav-links {
     gap: 8px;
+  }
+
+  .nav-right {
+    gap: 4px;
   }
   
   .nav-item {
