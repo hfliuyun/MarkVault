@@ -1,0 +1,9 @@
+{
+  "id": "markvault-publisher",
+  "name": "MarkVault Publisher",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Publish notes and images to a self-hosted MarkVault blog server.",
+  "author": "liuyun",
+  "isDesktopOnly": false
+}

@@ -5,6 +5,7 @@
 MarkVault 是一个 Markdown 优先的个人博客 / 知识库系统，由 Vue 3 前端和 Flask 后端组成。
 
 - `blog_by_vue/`：Vue 3 + Vite 前端。页面位于 `src/views/`，共享组件位于 `src/components/`，API 封装位于 `src/api/`，组合式逻辑位于 `src/composables/`，路由位于 `src/router/`。
+- `obsidian-plugin/`：Obsidian 发布插件（TypeScript + esbuild），把笔记和 images/ 目录直传后端 `/api/posts/upload`；构建方式见其 README。
 - `server_flask/`：Flask 后端 API。公开博客路由位于 `app/api/routes.py`，认证路由位于 `app/api/auth_routes.py`，Pastebin 路由位于 `app/api/paste_routes.py`，应用初始化位于 `app/__init__.py`。
 - `docs/`：架构、API、内容写作、开发规范、需求和变更记录。
 - `docs/specs/`：功能设计和重构设计存档。
