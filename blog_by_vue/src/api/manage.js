@@ -26,3 +26,13 @@ export async function deletePost(slug) {
   const response = await axios.delete(`/api/posts/${encodeURIComponent(slug)}`);
   return response.data;
 }
+
+export async function getPostRaw(slug) {
+  const response = await axios.get(`/api/manage/posts/${encodeURIComponent(slug)}/raw`);
+  return response.data;
+}
+
+export async function updatePostContent(slug, body) {
+  const response = await axios.put(`/api/manage/posts/${encodeURIComponent(slug)}/content`, { body });
+  return response.data;
+}

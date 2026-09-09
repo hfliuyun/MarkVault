@@ -91,6 +91,14 @@ export default class MarkVaultPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "markvault-pull-current",
+      name: "从服务器拉取当前文章",
+      callback: () => {
+        void this.pullActiveNote();
+      },
+    });
+
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
         if (file instanceof TFile) {
@@ -335,6 +343,102 @@ export default class MarkVaultPlugin extends Plugin {
     return new Promise<boolean>((resolve) => {
       new LoginModal(this.app, this, resolve).open();
     });
+  }
+
+  private async pullActiveNote(): Promise<void> {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) {
+      new Notice("没有打开的笔记");
+      return;
+    }
+    await this.pullNote(file);
+  }
+
+  /** Pull the server copy of a note back into the vault. The web editor
+   * writes to the server only; this closes the loop for emergency fixes. */
+  private async pullNote(file: TFile): Promise<void> {
+    const slug = this.frontmatterSlug(file);
+    if (!slug) {
+      new Notice("该笔记没有 frontmatter slug");
+      return;
+    }
+    if (!this.settings.serverUrl) {
+      new Notice("请先在插件设置里填写服务器地址");
+      return;
+    }
+    if (!this.settings.deviceToken) {
+      const loggedIn = await this.openLoginModal();
+      if (!loggedIn) return;
+    }
+
+    const raw = await this.fetchPostRaw(slug);
+    if (raw === null) return;
+
+    const localContent = await this.app.vault.read(file);
+    if (localContent === raw) {
+      new Notice("本地与服务器一致");
+      return;
+    }
+
+    const overwrite = await new Promise<boolean>((resolve) => {
+      new ConfirmModal(
+        this.app,
+        "拉取服务器版本",
+        `服务器上的「${slug}」与本地不同，本地笔记将被服务器版本覆盖（图片不受影响）。`,
+        () => resolve(true),
+        () => resolve(false)
+      ).open();
+    });
+    if (!overwrite) return;
+
+    await this.app.vault.modify(file, raw);
+    // Update the recorded hash so auto-publish does not echo the pulled
+    // content straight back to the server.
+    this.publishState[file.path] = { slug, hash: await this.computePostHash(file) };
+    await this.saveSettings();
+    new Notice("已拉取服务器版本到本地");
+  }
+
+  private async fetchPostRaw(slug: string): Promise<string | null> {
+    try {
+      return await this.fetchPostRawOnce(slug);
+    } catch (error) {
+      new Notice(`拉取失败：${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  private async fetchPostRawOnce(slug: string): Promise<string | null> {
+    const response = await requestUrl({
+      url: `${this.settings.serverUrl}/api/manage/posts/${encodeURIComponent(slug)}/raw`,
+      method: "GET",
+      headers: { Authorization: `Bearer ${this.settings.deviceToken}` },
+      throw: false,
+    });
+
+    if (response.status === 200) {
+      const body = safeJson(response);
+      if (typeof body?.raw === "string") return body.raw;
+      new Notice("拉取失败：响应格式异常");
+      return null;
+    }
+
+    if (response.status === 401) {
+      this.settings.deviceToken = "";
+      await this.saveSettings();
+      const retried = await this.openLoginModal();
+      if (retried) return this.fetchPostRawOnce(slug);
+      return null;
+    }
+
+    if (response.status === 404) {
+      new Notice("文章不存在（或服务器后端未部署最新版本）");
+      return null;
+    }
+
+    const body = safeJson(response);
+    new Notice(`拉取失败：${String(body?.error ?? `HTTP ${response.status}`)}`);
+    return null;
   }
 }
 

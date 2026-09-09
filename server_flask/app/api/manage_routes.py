@@ -113,6 +113,61 @@ def delete_post_route(slug):
     return jsonify({"message": "Post deleted", **result})
 
 
+@api_bp.route('/manage/posts/<slug>/raw', methods=['GET'])
+@require_auth
+def get_post_raw(slug):
+    try:
+        index = get_content_index()
+    except ContentIndexError as error:
+        return content_error_response(error)
+
+    post = index.posts_by_slug.get(slug)
+    if not post:
+        return jsonify({"error": f"Post '{slug}' not found."}), 404
+
+    raw = post.source_path.read_text(encoding="utf-8")
+    try:
+        frontmatter_text, body = post_manager.split_raw_post(raw)
+    except post_manager.PostManagerError as error:
+        return jsonify({"error": str(error)}), 400
+
+    return jsonify({
+        "slug": slug,
+        "path": post.source_path.relative_to(index.content_root).as_posix(),
+        "frontmatter": frontmatter_text,
+        "body": body,
+        "raw": raw,
+    })
+
+
+@api_bp.route('/manage/posts/<slug>/content', methods=['PUT'])
+@require_auth
+def update_post_content(slug):
+    payload = request.get_json(silent=True) or {}
+    body = payload.get("body")
+    if not isinstance(body, str):
+        return jsonify({"error": "body must be a string."}), 400
+
+    try:
+        index = get_content_index()
+    except ContentIndexError as error:
+        return content_error_response(error)
+
+    post = index.posts_by_slug.get(slug)
+    if not post:
+        return jsonify({"error": f"Post '{slug}' not found."}), 404
+
+    try:
+        post_manager.update_post_body(post.source_path, body)
+    except post_manager.PostManagerError as error:
+        return jsonify({"error": str(error)}), error.status_code
+
+    return jsonify({
+        "path": post.source_path.relative_to(index.content_root).as_posix(),
+        "message": "Post updated",
+    })
+
+
 def _coerce_order(value):
     if value in (None, ""):
         return None

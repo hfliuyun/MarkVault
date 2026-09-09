@@ -402,6 +402,88 @@ class ManageRoutesTestCase(unittest.TestCase):
 
         self.assertEqual(self.client.delete("/api/posts/git-basic", headers=self.auth).status_code, 404)
 
+    # --- raw / content editing ---
+
+    def test_raw_and_content_endpoints_require_auth(self):
+        write_post_on_disk(self.content_root, "posts/git-basic", "Git Basic", "git-basic")
+        self.assertEqual(self.client.get("/api/manage/posts/git-basic/raw").status_code, 401)
+        self.assertEqual(
+            self.client.put(
+                "/api/manage/posts/git-basic/content", json={"body": "x"}
+            ).status_code,
+            401,
+        )
+
+    def test_get_raw_returns_frontmatter_and_body(self):
+        write_post_on_disk(self.content_root, "posts/git-basic", "Git Basic", "git-basic")
+        response = self.client.get("/api/manage/posts/git-basic/raw", headers=self.auth)
+        data = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["path"], "posts/git-basic/index.md")
+        self.assertIn("slug: git-basic", data["frontmatter"])
+        self.assertIn("## Git Basic", data["body"])
+        self.assertIn(data["frontmatter"], data["raw"])
+
+    def test_get_raw_supports_slug_named_markdown(self):
+        post_dir = self.content_root / "posts" / "named-post"
+        post_dir.mkdir(parents=True)
+        (post_dir / "named-post.md").write_text(
+            index_md("Named", "named-post") + "\nbody text\n", encoding="utf-8"
+        )
+
+        response = self.client.get("/api/manage/posts/named-post/raw", headers=self.auth)
+        data = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["path"], "posts/named-post/named-post.md")
+        self.assertIn("body text", data["body"])
+
+    def test_get_raw_unknown_slug_returns_404(self):
+        response = self.client.get("/api/manage/posts/missing/raw", headers=self.auth)
+        self.assertEqual(response.status_code, 404)
+
+    def test_update_content_replaces_body_and_keeps_frontmatter(self):
+        write_post_on_disk(self.content_root, "posts/git-basic", "Git Basic", "git-basic")
+        source = self.content_root / "posts" / "git-basic" / "index.md"
+        before = source.read_text(encoding="utf-8")
+
+        response = self.client.put(
+            "/api/manage/posts/git-basic/content",
+            json={"body": "\n## Updated\n\nnew paragraph\n"},
+            headers=self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["path"], "posts/git-basic/index.md")
+
+        after = source.read_text(encoding="utf-8")
+        self.assertEqual(before.split("---\n")[1], after.split("---\n")[1])
+        self.assertIn("## Updated", after)
+        self.assertNotIn("## Git Basic", after)
+
+        index = ContentIndex(self.content_root)
+        self.assertIn("new paragraph", index.get_post("git-basic").content)
+
+    def test_update_content_is_visible_without_restart(self):
+        write_post_on_disk(self.content_root, "posts/git-basic", "Git Basic", "git-basic")
+        self.client.put(
+            "/api/manage/posts/git-basic/content",
+            json={"body": "brand new text"},
+            headers=self.auth,
+        )
+
+        response = self.client.get("/api/posts/git-basic")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("brand new text", response.get_json()["content"])
+
+    def test_update_content_rejects_non_string_body(self):
+        write_post_on_disk(self.content_root, "posts/git-basic", "Git Basic", "git-basic")
+        response = self.client.put(
+            "/api/manage/posts/git-basic/content", json={"body": 123}, headers=self.auth
+        )
+        self.assertEqual(response.status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

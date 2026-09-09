@@ -123,6 +123,43 @@ def delete_post(slug: str, content_index) -> dict[str, str]:
     return {"slug": slug}
 
 
+def split_raw_post(raw: str) -> tuple[str, str]:
+    """Split raw markdown into (frontmatter_text, body).
+
+    The fence is the first standalone "---" line through the next standalone
+    "---" line. Raises PostManagerError when the closing fence is missing."""
+    lines = raw.split("\n")
+    if not lines or lines[0].strip() != "---":
+        raise PostManagerError("Post markdown does not start with a frontmatter fence.")
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return (
+                "\n".join(lines[1:index]),
+                "\n".join(lines[index + 1 :]).lstrip("\n"),
+            )
+    raise PostManagerError("Post markdown has no closing frontmatter fence.")
+
+
+def update_post_body(source_path: Path, body: str) -> None:
+    """Replace the body of an existing post, keeping its frontmatter bytes
+    untouched.
+
+    The composed document is validated (same checks as uploads) and written
+    atomically, so a bad update can never leave a broken post behind that
+    would take down the whole content index."""
+    frontmatter_text, _ = split_raw_post(source_path.read_text(encoding="utf-8"))
+    composed = f"---\n{frontmatter_text}\n---\n\n{body.strip()}\n"
+
+    tmp_path = source_path.with_name(source_path.name + ".tmp")
+    try:
+        tmp_path.write_text(composed, encoding="utf-8")
+        _parse_and_validate(tmp_path)
+        os.replace(tmp_path, source_path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
 def _safe_extract(zip_path: Path, extract_root: Path) -> None:
     """Extract a ZIP, guarding against path traversal and skipping files whose
     extension is not in ALLOWED_EXT (and macOS metadata junk)."""

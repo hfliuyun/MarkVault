@@ -1,10 +1,12 @@
 <script setup>
-import { Delete, FolderOpened, Plus, Refresh, UploadFilled, View } from '@element-plus/icons-vue';
+import { Delete, EditPen, FolderOpened, Plus, Refresh, UploadFilled, View } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import JSZip from 'jszip';
-import { deletePost, downloadTemplate, listManagedPosts, uploadPost } from '@/api/manage';
+import { MdEditor } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
+import { deletePost, downloadTemplate, getPostRaw, listManagedPosts, updatePostContent, uploadPost } from '@/api/manage';
 import { listCategories, listTags } from '@/api/taxonomy';
 import { listSeries } from '@/api/series';
 import { useAuth } from '@/composables/useAuth';
@@ -249,6 +251,48 @@ async function doUpload(overwrite = false) {
   }
 }
 
+/* ---------- Tab 4: 编辑文章 ---------- */
+const editorSlug = ref('');
+const editorFrontmatter = ref('');
+const editorBody = ref('');
+const editorLoading = ref(false);
+const editorSaving = ref(false);
+const editorTheme = ref('light');
+
+async function openEditor(slug) {
+  editorSlug.value = slug;
+  editorTheme.value = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  activeTab.value = 'edit';
+  await loadEditorPost();
+}
+
+async function loadEditorPost() {
+  editorLoading.value = true;
+  try {
+    const data = await getPostRaw(editorSlug.value);
+    editorFrontmatter.value = data.frontmatter;
+    editorBody.value = data.body;
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || '加载文章失败');
+    activeTab.value = 'list';
+  } finally {
+    editorLoading.value = false;
+  }
+}
+
+async function saveEditorContent() {
+  if (!editorSlug.value) return;
+  editorSaving.value = true;
+  try {
+    await updatePostContent(editorSlug.value, editorBody.value);
+    ElMessage.success('已保存，页面即刻生效');
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || '保存失败');
+  } finally {
+    editorSaving.value = false;
+  }
+}
+
 const locationLabel = (location) => (location === 'series' ? '系列' : '独立');
 
 onMounted(async () => {
@@ -305,11 +349,15 @@ onMounted(async () => {
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
+            <el-table-column label="操作" width="210" fixed="right">
               <template #default="{ row }">
                 <el-button text size="small" @click="viewPost(row.slug)">
                   <el-icon><View /></el-icon>
                   查看
+                </el-button>
+                <el-button text size="small" @click="openEditor(row.slug)">
+                  <el-icon><EditPen /></el-icon>
+                  编辑
                 </el-button>
                 <el-popconfirm
                   title="确定删除这篇文章？"
@@ -470,6 +518,30 @@ onMounted(async () => {
             </div>
           </div>
         </el-tab-pane>
+
+        <!-- Tab 4: 编辑文章 -->
+        <el-tab-pane label="编辑文章" name="edit">
+          <div v-loading="editorLoading" class="editor-wrap">
+            <template v-if="editorSlug">
+              <div class="editor-meta">
+                <span class="editor-slug">{{ editorSlug }}</span>
+                <span class="editor-hint">元数据请在 Obsidian 中维护，网页仅改正文；保存后立即生效</span>
+              </div>
+              <pre class="frontmatter-view">{{ editorFrontmatter }}</pre>
+              <MdEditor
+                v-model="editorBody"
+                :theme="editorTheme"
+                class="body-editor"
+              />
+              <div class="form-actions">
+                <el-button @click="activeTab = 'list'">返回列表</el-button>
+                <el-button type="primary" :loading="editorSaving" @click="saveEditorContent">
+                  保存
+                </el-button>
+              </div>
+            </template>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </section>
   </section>
@@ -507,6 +579,49 @@ onMounted(async () => {
 
 .muted {
   color: var(--blog-muted);
+}
+
+/* 编辑文章 */
+.editor-wrap {
+  min-height: 200px;
+}
+
+.editor-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.editor-slug {
+  font-weight: 600;
+  color: var(--blog-text);
+}
+
+.editor-hint {
+  font-size: 13px;
+  color: var(--blog-muted);
+}
+
+.frontmatter-view {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--blog-border);
+  border-radius: var(--radius-md);
+  background: var(--blog-surface);
+  color: var(--blog-subtle);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.body-editor {
+  height: 60vh;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 /* 表单（模板 / 上传） */

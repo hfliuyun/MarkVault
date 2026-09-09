@@ -50,6 +50,32 @@ Authorization: Bearer <jwt-token>
 - `400`：尚未配置 TOTP
 - `401`：验证码无效
 
+### `POST /api/auth/device_token`
+
+验证 6 位 TOTP 动态码并返回长期设备令牌（30 天），供 Obsidian 发布插件等本地可信客户端使用。验证逻辑与 `/api/auth/verify` 相同，仅有效期不同。
+
+请求体：
+
+```json
+{
+  "code": "123456"
+}
+```
+
+成功响应：
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expires_in": 2592000
+}
+```
+
+错误：
+
+- `400`：尚未配置 TOTP
+- `401`：验证码无效
+
 ### `GET /api/auth/status`
 
 检查当前 Bearer token 是否有效。
@@ -72,7 +98,7 @@ Authorization: Bearer <jwt-token>
 
 ### `GET /api/auth/provisioning-uri`
 
-返回已配置的 `otpauth://` URI，方便首次绑定时手动导入认证器。该接口只在服务端已生成密钥后可用。
+已移除：TOTP 绑定改为在服务器终端执行 `python3 manage.py setup_totp` 完成扫码，不再提供线上接口。
 
 ## Pastebin
 
@@ -399,7 +425,7 @@ Markdown 中推荐写法：
 }
 ```
 
-成功时返回 `application/zip`，文件名为 `<slug>.zip`。ZIP 内包含 `<slug>/index.md` 和空的 `<slug>/images/` 目录。
+成功时返回 `application/zip`，文件名为 `<slug>.zip`。ZIP 内包含 `<slug>/<slug>.md` 和空的 `<slug>/images/` 目录。
 
 错误：
 
@@ -408,12 +434,10 @@ Markdown 中推荐写法：
 
 ### `POST /api/posts/upload`
 
-上传文章 ZIP，校验后发布到内容目录。
+上传文章 ZIP，校验后发布到内容目录。支持两种请求形式：
 
-表单字段：
-
-- `file`：ZIP 文件
-- `overwrite`：是否覆盖已有文章，字符串 `true` 或 `false`
+- **multipart 表单**（浏览器）：字段 `file`（ZIP 文件）+ `overwrite`（字符串 `true`/`false`）
+- **原始请求体**（脚本/插件）：`Content-Type: application/zip` 直接携带 ZIP 二进制，`overwrite` 走查询参数
 
 成功响应：
 
@@ -428,8 +452,8 @@ Markdown 中推荐写法：
 
 上传规则：
 
-- ZIP 必须包含 `index.md`。
-- 支持 `<slug>/index.md` 和顶层 `index.md` 两种结构。
+- 正文文件支持 `index.md`（旧约定）或 `<slug>.md`（推荐）命名，同一目录并存会报错。
+- 支持顶层结构（`index.md`）和 `<slug>/` 子目录结构。
 - 允许 Markdown 和常见图片格式。
 - ZIP 最大 50MB。
 - frontmatter 必须包含合法的 `title`、`slug` 和 `date`。
@@ -455,6 +479,52 @@ Markdown 中推荐写法：
 
 错误：
 
+- `404`：文章不存在
+
+### `GET /api/manage/posts/:slug/raw`
+
+读取文章原始内容，供在线编辑和 Obsidian 插件拉取使用。需要认证。
+
+成功响应：
+
+```json
+{
+  "slug": "logistic-regression",
+  "path": "posts/logistic-regression/logistic-regression.md",
+  "frontmatter": "title: 逻辑回归\nslug: logistic-regression",
+  "body": "## 逻辑回归\n\n...",
+  "raw": "---\ntitle: 逻辑回归\nslug: logistic-regression\n---\n\n## 逻辑回归\n\n..."
+}
+```
+
+错误：
+
+- `404`：文章不存在
+
+### `PUT /api/manage/posts/:slug/content`
+
+替换文章正文。frontmatter 保持原样不动，保存后内容索引热重载，页面即刻生效。需要认证。
+
+请求体：
+
+```json
+{
+  "body": "## 逻辑回归\n\n更新后的正文。"
+}
+```
+
+成功响应：
+
+```json
+{
+  "path": "posts/logistic-regression/logistic-regression.md",
+  "message": "Post updated"
+}
+```
+
+错误：
+
+- `400`：`body` 缺失或不是字符串
 - `404`：文章不存在
 
 详细设计见 [specs/2026-06-17-article-management-design.md](specs/2026-06-17-article-management-design.md)。

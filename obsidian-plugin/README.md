@@ -22,6 +22,8 @@ npm run build
 3. 打开一篇 frontmatter 带 `slug` 的笔记，点击侧栏上传图标，或执行
    **MarkVault: 发布当前文章**
 4. 可选：开启「自动发布」，笔记停止修改 N 分钟后自动上传（仅限带 slug 的笔记）
+5. 网页 `/manage` 上编辑过的文章，回到 Obsidian 打开后执行
+   **MarkVault: 从服务器拉取当前文章**，把网页修改同步回本地
 
 ## 发布规则
 
@@ -34,5 +36,7 @@ npm run build
 
 - 系列 `README.md` 与 `legacy/abbrlink-map.json` 不随笔记发布（现有 API 仅支持
   发布文章目录）；这部分目前仍依赖原有同步通道或手动上传
+- 网页 `/manage` 在线编辑只修改服务器副本，不会自动回传本地 vault；需要在
+  Obsidian 中执行「从服务器拉取当前文章」同步回来，否则下次本地发布会覆盖网页修改
 - 关闭 Obsidian 后不会推送
 - 设备令牌明文保存在插件 `data.json` 中，与网页端 localStorage 的安全等级一致
