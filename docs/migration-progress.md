@@ -19,14 +19,14 @@
 
 ## 当前状态
 
-**阶段 0、1、2 已完成，下一步是阶段 3（图片）。** 新站点的预览版已经部署到 https://markvault.wangsheng.workers.dev ，除图片外都能用：文章、系列、分类、标签、搜索、三套主题、旧链接跳转。图片要等阶段 3 的 `/img/*` Worker 和 Cloudinary 上传完成后才会显示。
+**阶段 0 到 3 已完成，下一步是阶段 4（Paste）。** 预览站点 https://markvault.wangsheng.workers.dev 上文章和图片都能正常显示。`markvault publish` 和新版 Obsidian 插件可以用了。只剩一件事要用户操作：在 Cloudinary 后台开启 Strict Transformations（见"待用户处理"）。
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
 | 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 完成 | 代码 `dbf0deb`；vault `ee21fc2` |
 | 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
 | 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成，已部署预览 | 见 git log |
-| 3 | 图片：无损压缩、Cloudinary、`/img/*` | 未开始 | |
+| 3 | 无损压缩、Cloudinary 上传、`/img/*` Worker、`publish`/`unpublish`、`published.json`、Obsidian 插件 0.2、`scripts/setup.sh` | 完成（Strict Transformations 待用户开启） | 见 git log；vault `e884a74` |
 | 4 | Paste：Worker、D1、设备信任、旧数据导入 | 未开始 | |
 | 5 | 切换域名到 Worker | 未开始 | |
 | 6 | 清理旧代码、更新文档、下线 DMIT | 未开始 | |
@@ -44,6 +44,8 @@
 
 ## 待用户处理
 
+0. **在 Cloudinary 后台开启 Strict Transformations**：Settings → Security → Restricted media types / Strict transformations。开启后只有上传时预先生成的 `f_webp,q_auto,c_limit,w_1600` 这一种转换能用，别人拼出别的转换参数时，不会消耗你的额度。开启后告诉 agent，agent 会验证我们自己的图片仍然能正常显示。
+   另外，如果 Obsidian 正开着，在「第三方插件」里把 MarkVault Publisher 关掉再打开，才会加载 0.2 版。
 1. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
 2. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
 3. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
@@ -87,20 +89,20 @@
 
 ## 下一步
 
-阶段 3：图片。
+阶段 4：Paste（设计文档第 6 节）。
 
-1. `packages/cli` 实现无损压缩（设计文档 4.2）。本机没有 oxipng、gifsicle、svgo，用 npm 包：oxipng 用 wasm 版（如 `@jsquash/oxipng`），JPEG 用 `jpegtran-bin` 或本机 `/opt/homebrew/bin/jpegtran`，GIF 用 `gifsicle` 包，SVG 用 `svgo`。逐像素比较用 `sharp` 解码。
-2. Cloudinary 签名上传：`public_id` = `markvault/<hash>`，加 eager 转换 `f_webp,q_auto,c_limit,w_1600`。然后在 Cloudinary 后台开启 Strict Transformations（需要用户操作，或者通过 Admin API 设置）。
-3. `markvault publish [笔记]`：
-   - 补 `publish`、`slug`、`date`
-   - 运行 check
-   - 上传图片，写 `images.json`
-   - vault 执行 git commit 和 push
-   - 用 `MARKVAULT_REQUIRE_UPLOADED=1` 构建
-   - 部署
-   - 写 `.markvault/published.json`，并实现设计文档 3.5 节里"slug 消失"的警告
-4. `site/worker/`：实现 `/img/*`（设计文档 4.5），给 `wrangler.jsonc` 加上 `main`、`run_worker_first: ["/img/*"]` 和 `CLOUDINARY_CLOUD` 变量。
-5. 重写 Obsidian 插件（设计文档 5.5），可以放在阶段 3 末尾，或者单独做。
+1. D1 建表：`site/worker/migrations/0001_init.sql`，用 `wrangler d1 migrations apply markvault --remote` 执行。数据库 id 见"阶段 0 明细"。
+2. Worker：
+   - `/api/paste/*` 下的全部接口（设计文档 6.4）
+   - 设备 cookie 和自动续期
+   - 配对码，最多试 5 次
+   - CSRF 检查：要求 JSON 请求，并校验 Origin
+   - Cron 每小时清理过期数据
+   - `/paste/<id>` 返回查看页的外壳
+   - `wrangler.jsonc` 加上 D1 绑定、`triggers.crons`，`run_worker_first` 加上 `/api/*` 和 `/paste/*`
+3. `markvault paste-invite`：在本机生成 token，通过 `wrangler d1 execute --remote` 写入它的 hash，然后打印链接和二维码（二维码用 npm 包 `qrcode`，在终端里显示）。
+4. 页面：`paste/index.astro`（输入框和最近列表，未信任时显示配对码输入框）、`paste/view.astro`、`paste/pair.astro`（确认页，POST 后才真正使用 token）。用原生 TS 写，不用 Vue。
+5. 导入旧 paste：`.tmp/server-backup/MarkVault/server_flask/data/pastes/*.json` 里的 2 条，都是永不过期。
 
 ## 本地测试
 
@@ -188,3 +190,32 @@
   - Paste 页面（阶段 4）
   - `published.json` 检查（和 publish 一起做）
   - `scripts/setup.sh`
+
+### 2026-11-01（Kiro CLI，阶段 3）
+
+- `packages/cli/src/images/compress.ts`：无损压缩，所有格式压缩后都逐像素和原图比较。
+  - PNG：先删掉文本、时间和 EXIF 数据块，再用 oxipng-wasm 以 `-o2` 压缩。
+  - JPEG：jpegtran 只保留 ICC 色彩配置，照片有旋转信息时补一个只含 Orientation 的最小 EXIF。
+  - SVG：svgo。
+  - GIF：本机有 gifsicle 才压缩。
+  - 测试结果：
+    - 9 张图共 2758KB，压缩后 1590KB，像素全部一致。
+    - 合成的带 GPS 的 JPEG 压缩后不含 GPS，方向正确（测了 orientation 6 和 8，宽度为 801 这种不是 8 的倍数的也测了）。
+- `cloudinary.ts`：签名上传，`public_id` 为 `markvault/<hash>`，`overwrite=false`，位图会 eager 生成 WebP，失败最多重试 3 次。
+- `upload.ts`：上传待上传的图片，并按当前引用重建 `images.json`。
+- `note.ts`：
+  - `prepareNote`：用 yaml Document 修改 frontmatter，保留原来的注释和键的顺序。已有 slug 时不允许用 `--slug` 覆盖。
+  - `setPublishFlag`：供 unpublish 使用。
+- `git.ts`：提交并推送 vault。推送失败只给警告，不中断发布。
+- `packages/content/src/published.ts`：读写 `published.json`。`loadVault` 会根据它警告"已发布的 slug 不见了"。只有已发布的页面集合发生变化时才重写这个文件，避免产生没有内容的提交。
+- `site/worker/img.ts`：实现 `/img/*`。只接受站点会生成的那几种 URL；Referer 不在白名单时返回 403；用 caches.default 缓存，`Cache-Control` 设为一年加 `immutable`；SVG 响应带上 CSP；上游失败的响应不缓存。
+- 第一次真实发布：上传了 9 张图（vault 提交 `e884a74`）。线上测试结果：
+  - WebP 200，84KB，原图 266KB
+  - 第二次请求 `cf-cache-status: HIT`
+  - 外站 Referer 返回 403，本站 Referer 返回 200
+  - 非法路径返回 404，raw 图 200
+  - 用浏览器打开 aac-stream，两张图按 1600 宽加载
+- 按插件的运行方式做了一次完整发布：`env -i`、只有最基本的 PATH、带代理变量、没有 TTY。构建、部署、提交、推送全部成功。
+- Obsidian 插件 0.2：已重写，构建产物也复制到了 vault 的插件目录。`data.json` 换成了新设置，旧的明文设备令牌随之删除。
+- `scripts/setup.sh`：在本机完整跑过一遍，所有步骤都识别为"已配置"并跳过，最后的 check 通过。
+- 没做：验证 Strict Transformations 的效果（等用户在后台开启）；gifsicle 没装，所以 GIF 压缩没测。

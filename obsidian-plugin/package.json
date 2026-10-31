@@ -1,14 +1,11 @@
 {
   "name": "obsidian-markvault-publisher",
-  "version": "0.1.0",
-  "description": "Publish Obsidian notes to a self-hosted MarkVault blog server.",
+  "version": "0.2.0",
+  "description": "Publish Obsidian notes to MarkVault by calling the markvault CLI.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
-  },
-  "dependencies": {
-    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

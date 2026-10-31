@@ -722,6 +722,14 @@ site/src/styles/
 
 ### 阶段 3：图片
 
+实现补充：
+- PNG 用 oxipng 的 wasm 版，压缩级别 `-o2`。`-o4` 只再小 4% 左右，耗时却多一倍（一张 2700×4100 的图要 13 秒）。透明像素的颜色值保持不变（`optimiseAlpha=false`），所以逐像素比较能通过。
+- JPEG 用 jpegtran `-copy icc -optimize -progressive`。照片有旋转信息时，另写一个只包含 Orientation 的最小 EXIF 段，DCT 数据原样不动，像素完全一致。曾经尝试过用 jpegtran 做无损旋转，但解码后像素有 ±1 的差异，所以放弃了。
+- 为了把 EXIF 和 GPS 去掉，去元数据后的结果即使比原图大一点（不超过 5%）也照样采用。
+- 本机没有 jpegtran 或 gifsicle 时，JPEG 和 GIF 原样上传，给出提示，不中断发布。
+- Cloudinary 的 `cloud_name` 不写进 `wrangler.jsonc`，因为代码仓库是公开的，写进去别人就能绕过防盗链直接访问 Cloudinary。由 `markvault deploy` 和 `markvault publish` 用 `--var CLOUDINARY_CLOUD:<name>` 传入；本地测试时 `scripts/dev/serve-run.sh` 从本机配置读取。
+- 交付规则（转换参数、最大宽度、哪些格式原样交付）放在 `packages/content/src/delivery.ts`，CLI、渲染器和 Worker 共用这一份。
+
 - 实现无损压缩、Cloudinary 上传和 `/img/*`。把现有的 10 张图片全部压缩上传，生成 `images.json`。
 - 验收：逐像素比较全部通过；手机照片的 GPS 已删除，方向和颜色正确；`markvault check` 显示压缩前后的总大小。
 - 内容仓库停止跟踪图片文件。

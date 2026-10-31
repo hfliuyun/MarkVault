@@ -1,584 +1,324 @@
-import JSZip from "jszip";
+import { spawn } from "child_process";
+import { existsSync } from "fs";
+import * as path from "path";
 import {
   App,
+  FileSystemAdapter,
+  MarkdownView,
   Modal,
   Notice,
   Plugin,
   PluginSettingTab,
-  requestUrl,
   Setting,
   TFile,
-  TFolder,
 } from "obsidian";
 
+/**
+ * Thin front end for the `markvault` CLI (design doc 5.5). All publishing
+ * logic lives in the CLI so it also works without Obsidian; this plugin only
+ * picks the note, asks for a slug when needed and shows the CLI output.
+ */
+
 interface MarkVaultSettings {
-  serverUrl: string;
-  deviceToken: string;
-  autoPublish: boolean;
-  debounceMinutes: number;
+  /** Path of the MarkVault code repository (contains packages/cli). */
+  repoPath: string;
+  /** Node.js binary; GUI apps on macOS do not inherit the shell PATH. */
+  nodePath: string;
+  /** Optional HTTP proxy for git push / wrangler, e.g. http://127.0.0.1:10808 */
+  proxy: string;
+  /** Public site address used for "open article" links. */
+  siteUrl: string;
 }
 
 const DEFAULT_SETTINGS: MarkVaultSettings = {
-  serverUrl: "",
-  deviceToken: "",
-  autoPublish: false,
-  debounceMinutes: 3,
+  repoPath: "",
+  nodePath: "",
+  proxy: "",
+  siteUrl: "",
 };
 
-interface PublishStateEntry {
-  slug: string;
-  hash: string;
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const NODE_CANDIDATES = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"];
+// eslint-disable-next-line no-control-regex
+const ANSI = /\u001b\[[0-9;]*[A-Za-z]/g;
+
+function suggestSlug(title: string): string {
+  return (title.toLowerCase().match(/[a-z0-9]+/g) ?? []).join("-").slice(0, 60).replace(/-+$/, "");
 }
 
-type PublishState = Record<string, PublishStateEntry>;
-
-interface PluginData {
-  settings: MarkVaultSettings;
-  publishState: PublishState;
-}
-
-async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text)
-  );
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** requestUrl.json throws on non-JSON bodies (e.g. HTML 404 pages). */
-function safeJson(response: { json: unknown }): Record<string, unknown> | null {
-  try {
-    const parsed = response.json;
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
+interface RunResult {
+  code: number;
+  output: string;
 }
 
 export default class MarkVaultPlugin extends Plugin {
   settings: MarkVaultSettings = DEFAULT_SETTINGS;
-  publishState: PublishState = {};
-  private autoPublishTimers = new Map<string, number>();
+  private running = false;
 
   async onload(): Promise<void> {
-    const data = (await this.loadData()) as Partial<PluginData> | null;
+    const data = (await this.loadData()) as { settings?: Partial<MarkVaultSettings> } | null;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings);
-    this.publishState = data?.publishState ?? {};
-
     this.addSettingTab(new MarkVaultSettingTab(this.app, this));
 
-    this.addRibbonIcon("upload", "发布当前文章到 MarkVault", () => {
-      void this.publishActiveNote();
-    });
-
-    this.addCommand({
-      id: "markvault-login",
-      name: "登录 MarkVault（获取设备令牌）",
-      callback: () => {
-        this.openLoginModal();
-      },
-    });
-
-    this.addCommand({
-      id: "markvault-publish-current",
-      name: "发布当前文章",
-      callback: () => {
-        void this.publishActiveNote();
-      },
-    });
-
-    this.addCommand({
-      id: "markvault-pull-current",
-      name: "从服务器拉取当前文章",
-      callback: () => {
-        void this.pullActiveNote();
-      },
-    });
-
-    this.registerEvent(
-      this.app.vault.on("modify", (file) => {
-        if (file instanceof TFile) {
-          this.scheduleAutoPublish(file);
-        }
-      })
-    );
-
-    this.registerEvent(
-      this.app.vault.on("delete", (file) => {
-        if (file instanceof TFile && this.publishState[file.path]) {
-          delete this.publishState[file.path];
-          void this.saveSettings();
-        }
-      })
-    );
-  }
-
-  onunload(): void {
-    for (const timer of this.autoPublishTimers.values()) {
-      window.clearTimeout(timer);
-    }
-    this.autoPublishTimers.clear();
+    this.addRibbonIcon("upload", "发布当前笔记到 MarkVault", () => void this.publishActive());
+    this.addCommand({ id: "publish-current", name: "发布当前笔记", callback: () => void this.publishActive() });
+    this.addCommand({ id: "publish-all", name: "重新发布整个站点（不修改笔记）", callback: () => void this.publishAll() });
+    this.addCommand({ id: "check", name: "检查全部内容", callback: () => void this.check() });
+    this.addCommand({ id: "unpublish-current", name: "取消发布当前笔记", callback: () => void this.unpublishActive() });
   }
 
   async saveSettings(): Promise<void> {
-    await this.saveData({
-      settings: this.settings,
-      publishState: this.publishState,
-    });
+    await this.saveData({ settings: this.settings });
   }
 
-  /** Notes carrying a frontmatter slug are treated as blog posts. */
-  frontmatterSlug(file: TFile): string | null {
-    if (file.extension !== "md") return null;
-    const cache = this.app.metadataCache.getFileCache(file);
-    const slug = cache?.frontmatter?.slug;
-    if (typeof slug !== "string" || !slug.trim()) return null;
-    return slug.trim();
+  private vaultRoot(): string | null {
+    const adapter = this.app.vault.adapter;
+    return adapter instanceof FileSystemAdapter ? adapter.getBasePath() : null;
   }
 
-  private scheduleAutoPublish(file: TFile): void {
-    if (!this.settings.autoPublish) return;
-    if (!this.frontmatterSlug(file)) return;
-    if (!this.settings.deviceToken) return;
-
-    const existing = this.autoPublishTimers.get(file.path);
-    if (existing) window.clearTimeout(existing);
-
-    const delay = Math.max(1, this.settings.debounceMinutes) * 60 * 1000;
-    const timer = window.setTimeout(() => {
-      this.autoPublishTimers.delete(file.path);
-      void this.publishNote(file, { manual: false });
-    }, delay);
-    this.autoPublishTimers.set(file.path, timer);
+  private nodeBinary(): string {
+    if (this.settings.nodePath) return this.settings.nodePath;
+    return NODE_CANDIDATES.find((candidate) => existsSync(candidate)) ?? "node";
   }
 
-  private async publishActiveNote(): Promise<void> {
+  private cliEntry(): string | null {
+    if (!this.settings.repoPath) return null;
+    const entry = path.join(this.settings.repoPath, "packages", "cli", "src", "main.ts");
+    return existsSync(entry) ? entry : null;
+  }
+
+  private activeNote(): TFile | null {
     const file = this.app.workspace.getActiveFile();
-    if (!file) {
-      new Notice("没有打开的笔记");
-      return;
+    if (!file || file.extension !== "md") {
+      new Notice("请先打开一篇 Markdown 笔记");
+      return null;
     }
-    await this.publishNote(file, { manual: true });
+    return file;
   }
 
-  private async publishNote(
-    file: TFile,
-    options: { manual: boolean }
-  ): Promise<void> {
-    const slug = this.frontmatterSlug(file);
-    if (!slug) {
-      if (options.manual) {
-        new Notice("该笔记没有 frontmatter slug，跳过发布");
-      }
-      return;
+  /** Run the CLI, streaming output into a log window. */
+  private async run(title: string, args: string[]): Promise<RunResult | null> {
+    if (this.running) {
+      new Notice("MarkVault 正在运行，请等它结束");
+      return null;
+    }
+    const entry = this.cliEntry();
+    const vault = this.vaultRoot();
+    if (!entry || !vault) {
+      new Notice("请先在插件设置里填写 MarkVault 仓库路径");
+      return null;
     }
 
-    if (!this.settings.serverUrl) {
-      if (options.manual) new Notice("请先在插件设置里填写服务器地址");
-      return;
-    }
+    // Make sure the editor buffer is on disk before the CLI reads it.
+    await this.app.workspace.getActiveViewOfType(MarkdownView)?.save();
 
-    const previous = this.publishState[file.path];
-    const hash = await this.computePostHash(file);
-    if (previous && previous.hash === hash) {
-      if (options.manual) new Notice("内容未变化，无需发布");
-      return;
-    }
-
-    if (!this.settings.deviceToken) {
-      if (!options.manual) return;
-      await this.openLoginModal();
-      if (!this.settings.deviceToken) return;
-    }
-
-    const overwrite = Boolean(previous);
-    const published = await this.uploadPost(file, slug, hash, overwrite, options);
-    if (published) {
-      this.publishState[file.path] = { slug, hash };
-      await this.saveSettings();
-    }
-  }
-
-  private async computePostHash(note: TFile): Promise<string> {
-    const content = await this.app.vault.cachedRead(note);
-    const parts = [content];
-    for (const image of this.collectImageFiles(note)) {
-      parts.push(`${image.path}:${image.stat.size}:${image.stat.mtime}`);
-    }
-    return sha256Hex(parts.join("\n"));
-  }
-
-  /** images/ folder (including subfolders) next to the note. */
-  private collectImageFiles(note: TFile): TFile[] {
-    const parentPath = note.parent?.path ?? "/";
-    const imagesRoot = this.app.vault.getAbstractFileByPath(
-      `${parentPath}/images`
-    );
-    const files: TFile[] = [];
-    if (imagesRoot instanceof TFolder) {
-      this.walkFolder(imagesRoot, files);
-    }
-    return files;
-  }
-
-  private walkFolder(folder: TFolder, files: TFile[]): void {
-    for (const child of folder.children) {
-      if (child instanceof TFolder) {
-        this.walkFolder(child, files);
-      } else if (child instanceof TFile) {
-        files.push(child);
-      }
-    }
-  }
-
-  private async buildPostZip(note: TFile, slug: string): Promise<ArrayBuffer> {
-    const parentPath = note.parent?.path ?? "/";
-    const zip = new JSZip();
-    zip.file(`${slug}/${note.name}`, await this.app.vault.readBinary(note));
-    for (const image of this.collectImageFiles(note)) {
-      const relativePath = image.path.slice(parentPath.length + 1);
-      zip.file(`${slug}/${relativePath}`, await this.app.vault.readBinary(image));
-    }
-    return zip.generateAsync({ type: "arraybuffer" });
-  }
-
-  /** Returns true when the note is published (or unchanged) on the server. */
-  private async uploadPost(
-    note: TFile,
-    slug: string,
-    hash: string,
-    overwrite: boolean,
-    options: { manual: boolean }
-  ): Promise<boolean> {
-    try {
-      return await this.uploadPostOnce(note, slug, hash, overwrite, options);
-    } catch (error) {
-      if (options.manual) {
-        new Notice(`发布失败：${(error as Error).message}`);
-      }
-      return false;
-    }
-  }
-
-  private async uploadPostOnce(
-    note: TFile,
-    slug: string,
-    hash: string,
-    overwrite: boolean,
-    options: { manual: boolean }
-  ): Promise<boolean> {
-    const zipBody = await this.buildPostZip(note, slug);
-    const response = await requestUrl({
-      url: `${this.settings.serverUrl}/api/posts/upload?overwrite=${overwrite}`,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.settings.deviceToken}`,
-        "Content-Type": "application/zip",
-      },
-      body: zipBody,
-      throw: false,
-    });
-
-    if (response.status === 201) {
-      const published = safeJson(response);
-      new Notice(`已发布：${String(published?.path ?? slug)}`);
-      return true;
-    }
-
-    if (response.status === 401) {
-      this.settings.deviceToken = "";
-      await this.saveSettings();
-      if (options.manual) {
-        const retried = await this.openLoginModal();
-        if (retried) {
-          return this.uploadPostOnce(note, slug, hash, overwrite, options);
-        }
-      } else {
-        new Notice("MarkVault 设备令牌已过期，请手动重新登录");
-      }
-      return false;
-    }
-
-    if (response.status === 404) {
-      if (options.manual) {
-        new Notice("接口不存在（HTTP 404）：服务器后端可能未部署最新版本");
-      }
-      return false;
-    }
-
-    if (response.status === 409) {
-      if (!options.manual) {
-        new Notice(`slug "${slug}" 在服务器上已存在其他文章，请手动发布确认覆盖`);
-        return false;
-      }
-      const body = safeJson(response);
-      const serverMessage = String(body?.error ?? "该 slug 已存在");
-      const overwriteNow = await new Promise<boolean>((resolve) => {
-        new ConfirmModal(
-          this.app,
-          "覆盖已有文章",
-          serverMessage,
-          () => resolve(true),
-          () => resolve(false)
-        ).open();
+    const node = this.nodeBinary();
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      PATH: [path.dirname(node), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", process.env.PATH ?? ""].join(":"),
+      NO_COLOR: "1",
+      FORCE_COLOR: "0",
+    };
+    if (this.settings.proxy) {
+      Object.assign(env, {
+        HTTP_PROXY: this.settings.proxy,
+        HTTPS_PROXY: this.settings.proxy,
+        http_proxy: this.settings.proxy,
+        https_proxy: this.settings.proxy,
+        NODE_USE_ENV_PROXY: "1",
       });
-      if (overwriteNow) {
-        return this.uploadPostOnce(note, slug, hash, true, options);
-      }
-      return false;
     }
 
-    const body = safeJson(response);
-    const message = String(body?.error ?? `HTTP ${response.status}`);
-    if (options.manual) new Notice(`发布失败：${message}`);
-    return false;
-  }
-
-  /** Opens the TOTP login modal; resolves true when a token was obtained. */
-  openLoginModal(): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      new LoginModal(this.app, this, resolve).open();
-    });
-  }
-
-  private async pullActiveNote(): Promise<void> {
-    const file = this.app.workspace.getActiveFile();
-    if (!file) {
-      new Notice("没有打开的笔记");
-      return;
-    }
-    await this.pullNote(file);
-  }
-
-  /** Pull the server copy of a note back into the vault. The web editor
-   * writes to the server only; this closes the loop for emergency fixes. */
-  private async pullNote(file: TFile): Promise<void> {
-    const slug = this.frontmatterSlug(file);
-    if (!slug) {
-      new Notice("该笔记没有 frontmatter slug");
-      return;
-    }
-    if (!this.settings.serverUrl) {
-      new Notice("请先在插件设置里填写服务器地址");
-      return;
-    }
-    if (!this.settings.deviceToken) {
-      const loggedIn = await this.openLoginModal();
-      if (!loggedIn) return;
-    }
-
-    const raw = await this.fetchPostRaw(slug);
-    if (raw === null) return;
-
-    const localContent = await this.app.vault.read(file);
-    if (localContent === raw) {
-      new Notice("本地与服务器一致");
-      return;
-    }
-
-    const overwrite = await new Promise<boolean>((resolve) => {
-      new ConfirmModal(
-        this.app,
-        "拉取服务器版本",
-        `服务器上的「${slug}」与本地不同，本地笔记将被服务器版本覆盖（图片不受影响）。`,
-        () => resolve(true),
-        () => resolve(false)
-      ).open();
-    });
-    if (!overwrite) return;
-
-    await this.app.vault.modify(file, raw);
-    // Update the recorded hash so auto-publish does not echo the pulled
-    // content straight back to the server.
-    this.publishState[file.path] = { slug, hash: await this.computePostHash(file) };
-    await this.saveSettings();
-    new Notice("已拉取服务器版本到本地");
-  }
-
-  private async fetchPostRaw(slug: string): Promise<string | null> {
+    const modal = new LogModal(this.app, title);
+    modal.open();
+    this.running = true;
     try {
-      return await this.fetchPostRawOnce(slug);
-    } catch (error) {
-      new Notice(`拉取失败：${(error as Error).message}`);
-      return null;
+      return await new Promise<RunResult>((resolve) => {
+        let output = "";
+        const child = spawn(node, [entry, ...args, "--vault", vault], { cwd: this.settings.repoPath, env });
+        const onData = (chunk: Buffer) => {
+          const text = chunk.toString("utf8").replace(ANSI, "");
+          output += text;
+          modal.append(text);
+        };
+        child.stdout.on("data", onData);
+        child.stderr.on("data", onData);
+        child.on("error", (error) => {
+          modal.append(`\n无法启动 ${node}：${error.message}\n请在插件设置里填写 Node 路径。\n`);
+          modal.finish(false);
+          resolve({ code: -1, output });
+        });
+        child.on("close", (code) => {
+          modal.finish(code === 0);
+          resolve({ code: code ?? -1, output });
+        });
+      });
+    } finally {
+      this.running = false;
     }
   }
 
-  private async fetchPostRawOnce(slug: string): Promise<string | null> {
-    const response = await requestUrl({
-      url: `${this.settings.serverUrl}/api/manage/posts/${encodeURIComponent(slug)}/raw`,
-      method: "GET",
-      headers: { Authorization: `Bearer ${this.settings.deviceToken}` },
-      throw: false,
-    });
-
-    if (response.status === 200) {
-      const body = safeJson(response);
-      if (typeof body?.raw === "string") return body.raw;
-      new Notice("拉取失败：响应格式异常");
-      return null;
+  private async publishActive(): Promise<void> {
+    const file = this.activeNote();
+    if (!file) return;
+    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    let slug = typeof frontmatter.slug === "string" ? frontmatter.slug.trim() : "";
+    const args = ["publish", file.path];
+    if (!slug) {
+      const title = typeof frontmatter.title === "string" ? frontmatter.title : file.basename;
+      const chosen = await new SlugModal(this.app, title, suggestSlug(title)).ask();
+      if (!chosen) return;
+      slug = chosen;
+      args.push("--slug", slug);
     }
-
-    if (response.status === 401) {
-      this.settings.deviceToken = "";
-      await this.saveSettings();
-      const retried = await this.openLoginModal();
-      if (retried) return this.fetchPostRawOnce(slug);
-      return null;
+    const result = await this.run(`发布：${file.basename}`, args);
+    if (result?.code === 0) {
+      const link = this.settings.siteUrl ? `${this.settings.siteUrl.replace(/\/$/, "")}/posts/${slug}/` : "";
+      new Notice(link ? `已发布：${link}` : "已发布", 8000);
     }
+  }
 
-    if (response.status === 404) {
-      new Notice("文章不存在（或服务器后端未部署最新版本）");
-      return null;
-    }
+  private async publishAll(): Promise<void> {
+    const result = await this.run("重新发布整个站点", ["publish"]);
+    if (result?.code === 0) new Notice("已发布");
+  }
 
-    const body = safeJson(response);
-    new Notice(`拉取失败：${String(body?.error ?? `HTTP ${response.status}`)}`);
-    return null;
+  private async check(): Promise<void> {
+    await this.run("检查全部内容", ["check"]);
+  }
+
+  private async unpublishActive(): Promise<void> {
+    const file = this.activeNote();
+    if (!file) return;
+    const confirmed = await new ConfirmModal(
+      this.app,
+      "取消发布",
+      `「${file.basename}」会从网站上下线（笔记本身不会删除）。继续？`,
+    ).ask();
+    if (!confirmed) return;
+    const result = await this.run(`取消发布：${file.basename}`, ["unpublish", file.path]);
+    if (result?.code === 0) new Notice("已下线");
   }
 }
 
-class LoginModal extends Modal {
-  private errorEl: HTMLElement | null = null;
-  private submitted = false;
+class LogModal extends Modal {
+  private pre!: HTMLPreElement;
+  private status!: HTMLElement;
 
-  constructor(
-    app: App,
-    private plugin: MarkVaultPlugin,
-    private onDone: (loggedIn: boolean) => void
-  ) {
+  constructor(app: App, private heading: string) {
     super(app);
   }
 
   onOpen(): void {
-    this.titleEl.setText("登录 MarkVault");
-    this.contentEl.createEl("p", {
-      text: "输入 Authenticator 的 6 位动态验证码，换取 30 天有效期的设备令牌。",
+    this.titleEl.setText(this.heading);
+    this.status = this.contentEl.createEl("p", { text: "运行中…" });
+    this.pre = this.contentEl.createEl("pre");
+    Object.assign(this.pre.style, {
+      maxHeight: "50vh",
+      overflow: "auto",
+      fontSize: "12px",
+      whiteSpace: "pre-wrap",
+      userSelect: "text",
     });
+  }
 
-    const input = this.contentEl.createEl("input", {
-      type: "text",
-      placeholder: "6 位动态验证码",
+  append(text: string): void {
+    if (!this.pre) return;
+    this.pre.appendText(text);
+    this.pre.scrollTop = this.pre.scrollHeight;
+  }
+
+  finish(ok: boolean): void {
+    if (!this.status) return;
+    this.status.setText(ok ? "✓ 完成" : "✗ 失败，详情见下面的输出");
+    this.status.style.color = ok ? "var(--color-green)" : "var(--color-red)";
+  }
+}
+
+class SlugModal extends Modal {
+  private resolve: (value: string | null) => void = () => {};
+  private settled = false;
+
+  constructor(app: App, private title: string, private suggestion: string) {
+    super(app);
+  }
+
+  ask(): Promise<string | null> {
+    return new Promise((resolve) => {
+      this.resolve = resolve;
+      this.open();
     });
+  }
+
+  onOpen(): void {
+    this.titleEl.setText("这篇笔记第一次发布，需要一个 slug");
+    this.contentEl.createEl("p", { text: `「${this.title}」的网址会是 /posts/<slug>/，发布后不要再改。` });
+    const input = this.contentEl.createEl("input", { type: "text", value: this.suggestion, placeholder: "例如 aac-stream" });
     input.style.width = "100%";
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        void this.submit(input.value);
+    const error = this.contentEl.createEl("p", { text: "" });
+    error.style.color = "var(--color-red)";
+    const submit = () => {
+      const value = input.value.trim();
+      if (!SLUG_PATTERN.test(value)) {
+        error.setText("只能用小写字母、数字和单个连字符");
+        return;
       }
+      this.settle(value);
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") submit();
     });
-
     new Setting(this.contentEl)
-      .addButton((button) =>
-        button
-          .setButtonText("验证")
-          .setCta()
-          .onClick(() => void this.submit(input.value))
-      )
-      .addButton((button) =>
-        button.setButtonText("取消").onClick(() => this.close())
-      );
-
-    this.errorEl = this.contentEl.createEl("p", { text: "" });
-    this.errorEl.style.color = "#d14343";
+      .addButton((button) => button.setButtonText("发布").setCta().onClick(submit))
+      .addButton((button) => button.setButtonText("取消").onClick(() => this.settle(null)));
     window.setTimeout(() => input.focus());
   }
 
-  private setError(message: string): void {
-    if (this.errorEl) this.errorEl.setText(message);
-  }
-
-  private async submit(rawCode: string): Promise<void> {
-    if (this.submitted) return;
-    const code = rawCode.trim();
-    if (!/^\d{6}$/.test(code)) {
-      this.setError("请输入 6 位数字验证码");
-      return;
-    }
-    if (!this.plugin.settings.serverUrl) {
-      this.setError("请先在插件设置里填写服务器地址");
-      return;
-    }
-    if (!/^https?:\/\//i.test(this.plugin.settings.serverUrl)) {
-      this.setError("服务器地址需要以 https:// 开头");
-      return;
-    }
-
-    this.submitted = true;
-    try {
-      const response = await requestUrl({
-        url: `${this.plugin.settings.serverUrl}/api/auth/device_token`,
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-        throw: false,
-      });
-      const body = safeJson(response);
-      if (response.status === 200 && typeof body?.token === "string") {
-        this.plugin.settings.deviceToken = body.token;
-        await this.plugin.saveSettings();
-        new Notice("登录成功，设备令牌有效期 30 天");
-        this.close();
-        this.onDone(true);
-        return;
-      }
-      if (response.status === 404) {
-        this.setError("接口不存在（HTTP 404）：服务器后端可能未部署最新版本");
-        return;
-      }
-      this.setError(String(body?.error ?? `验证失败（HTTP ${response.status}）`));
-    } catch (error) {
-      this.setError("无法连接服务器：请检查网络与服务器地址（需以 https:// 开头）");
-    } finally {
-      this.submitted = false;
-    }
+  private settle(value: string | null): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.resolve(value);
+    this.close();
   }
 
   onClose(): void {
+    this.settle(null);
     this.contentEl.empty();
-    if (!this.submitted) this.onDone(false);
   }
 }
 
 class ConfirmModal extends Modal {
-  constructor(
-    app: App,
-    title: string,
-    message: string,
-    private onConfirm: () => void,
-    private onCancel: () => void
-  ) {
+  private resolve: (value: boolean) => void = () => {};
+  private settled = false;
+
+  constructor(app: App, private heading: string, private message: string) {
     super(app);
-    this.titleEl.setText(title);
-    this.message = message;
   }
 
-  private message: string;
+  ask(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.resolve = resolve;
+      this.open();
+    });
+  }
 
   onOpen(): void {
+    this.titleEl.setText(this.heading);
     this.contentEl.createEl("p", { text: this.message });
     new Setting(this.contentEl)
-      .addButton((button) =>
-        button
-          .setButtonText("覆盖发布")
-          .setWarning()
-          .onClick(() => {
-            this.close();
-            this.onConfirm();
-          })
-      )
-      .addButton((button) =>
-        button.setButtonText("取消").onClick(() => {
-          this.close();
-          this.onCancel();
-        })
-      );
+      .addButton((button) => button.setButtonText("继续").setWarning().onClick(() => this.settle(true)))
+      .addButton((button) => button.setButtonText("取消").onClick(() => this.settle(false)));
+  }
+
+  private settle(value: boolean): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.resolve(value);
+    this.close();
   }
 
   onClose(): void {
+    this.settle(false);
     this.contentEl.empty();
   }
 }
@@ -591,66 +331,27 @@ class MarkVaultSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "MarkVault Publisher" });
+    containerEl.createEl("p", {
+      text: "插件只是调用 markvault 命令行工具。Cloudinary 和 Cloudflare 的凭据由 scripts/setup.sh 配置在本机，不保存在这里。",
+    });
 
-    new Setting(containerEl)
-      .setName("服务器地址")
-      .setDesc("MarkVault 后端地址，需以 https:// 开头")
-      .addText((text) =>
-        text
-          .setPlaceholder("https://blog.example.com")
-          .setValue(this.plugin.settings.serverUrl)
-          .onChange(async (value) => {
-            this.plugin.settings.serverUrl = value.trim().replace(/\/+$/, "");
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("设备令牌")
-      .setDesc(
-        this.plugin.settings.deviceToken
-          ? "已保存（有效期 30 天，过期后重新登录即可）"
-          : "未登录，点击右侧按钮输入验证码登录"
-      )
-      .addExtraButton((button) =>
-        button.setIcon("key").setTooltip("登录").onClick(() => {
-          this.plugin.openLoginModal();
-        })
-      )
-      .addExtraButton((button) =>
-        button.setIcon("trash").setTooltip("清除令牌").onClick(async () => {
-          this.plugin.settings.deviceToken = "";
-          await this.plugin.saveSettings();
-          this.display();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("自动发布")
-      .setDesc("笔记修改后按下方延迟自动发布（仅限带 frontmatter slug 的笔记）")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.autoPublish)
-          .onChange(async (value) => {
-            this.plugin.settings.autoPublish = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("自动发布延迟（分钟）")
-      .setDesc("停止修改后等待多少分钟再发布，避免写作过程中频繁上传")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.debounceMinutes))
-          .onChange(async (value) => {
-            const minutes = Number.parseInt(value, 10);
-            if (!Number.isNaN(minutes) && minutes >= 1 && minutes <= 60) {
-              this.plugin.settings.debounceMinutes = minutes;
+    const text = (name: string, desc: string, key: keyof MarkVaultSettings, placeholder: string) =>
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addText((input) =>
+          input
+            .setPlaceholder(placeholder)
+            .setValue(this.plugin.settings[key])
+            .onChange(async (value) => {
+              this.plugin.settings[key] = value.trim();
               await this.plugin.saveSettings();
-            }
-          })
-      );
+            }),
+        );
+
+    text("MarkVault 仓库路径", "代码仓库的绝对路径（里面有 packages/cli）", "repoPath", "/Users/you/code/MarkVault");
+    text("Node 路径", "留空时自动查找 /opt/homebrew/bin/node、/usr/local/bin/node", "nodePath", "/opt/homebrew/bin/node");
+    text("代理（可选）", "git push 和部署需要代理时填写", "proxy", "http://127.0.0.1:10808");
+    text("站点地址（可选）", "发布后用来显示文章链接", "siteUrl", "https://blog.example.com");
   }
 }

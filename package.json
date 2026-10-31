@@ -7,7 +7,7 @@
     "site"
   ],
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.23"
   },
   "scripts": {
     "markvault": "node packages/cli/src/main.ts",
@@ -19,6 +19,7 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
-    "workerd@1.20261023.1": true
+    "workerd@1.20261023.1": true,
+    "fsevents@2.3.3": true
   }
 }

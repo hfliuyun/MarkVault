@@ -1,6 +1,7 @@
 import path from "node:path";
 import { hashFile, readManifest } from "./images.ts";
 import { extractRefs, type RawImage, type RawLink } from "./links.ts";
+import { readPublished } from "./published.ts";
 import { FileResolver } from "./resolve.ts";
 import { scanVault, type ScanOptions } from "./scan.ts";
 import {
@@ -147,6 +148,27 @@ export async function loadVault(root: string, options: LoadOptions = {}): Promis
   }
 
   // Pass 3: resolve series membership.
+  try {
+    const published = await readPublished(absoluteRoot);
+    if (published) {
+      for (const [slug, previousPath] of Object.entries(published.posts)) {
+        if (postsBySlug.has(slug) || slugRedirects.has(slug)) continue;
+        diagnostics.push({
+          level: "warning",
+          file: previousPath,
+          message: `已发布过的文章 "${slug}" 这次不在了，/posts/${slug}/ 会变成 404。改了 slug 的话，把旧 slug 写进新文章的 redirect_from`,
+        });
+      }
+      for (const [slug, previousPath] of Object.entries(published.series)) {
+        if (seriesBySlug.has(slug)) continue;
+        diagnostics.push({ level: "warning", file: previousPath, message: `已发布过的系列 "${slug}" 这次不在了，/series/${slug}/ 会变成 404` });
+      }
+    }
+  } catch (error) {
+    diagnostics.push({ level: "warning", file: ".markvault/published.json", message: (error as Error).message });
+  }
+
+  // Resolve series membership.
   const seriesByPath = new Map(series.map((item) => [item.path, item]));
   for (const [post, ref] of seriesTargets) {
     const resolved = resolver.resolve(ref.target, post.path, ".md");

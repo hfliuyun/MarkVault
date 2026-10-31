@@ -1,9 +1,9 @@
 {
   "id": "markvault-publisher",
   "name": "MarkVault Publisher",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.4.0",
-  "description": "Publish notes and images to a self-hosted MarkVault blog server.",
+  "description": "Publish notes to a MarkVault blog via the local markvault CLI.",
   "author": "liuyun",
-  "isDesktopOnly": false
+  "isDesktopOnly": true
 }

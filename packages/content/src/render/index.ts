@@ -11,6 +11,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import path from "node:path";
+import { DELIVERY_MAX_WIDTH, PASSTHROUGH_FORMATS, normalizeFormat } from "../delivery.ts";
 import { stripObsidianComments } from "../links.ts";
 import type { ImageRef, Post, Series, VaultModel } from "../types.ts";
 import { remarkObsidian, type LinkContext } from "./obsidian.ts";
@@ -36,12 +37,17 @@ export interface RenderedNote {
 }
 
 /** Raster formats are delivered as WebP; svg/gif keep their format. */
-const KEEP_FORMAT = new Set(["svg", "gif"]);
-
 export function imagePublicPath(hash: string, extension: string, raw: boolean, base = "/img"): string {
-  const ext = extension.toLowerCase().replace(/^\./, "");
-  if (raw) return `${base}/raw/${hash}.${ext === "jpeg" ? "jpg" : ext}`;
-  return `${base}/${hash}.${KEEP_FORMAT.has(ext) ? ext : "webp"}`;
+  const ext = normalizeFormat(extension);
+  if (raw) return `${base}/raw/${hash}.${ext}`;
+  return `${base}/${hash}.${PASSTHROUGH_FORMATS.has(ext) ? ext : "webp"}`;
+}
+
+/** Size of the delivered file: WebP variants are capped at DELIVERY_MAX_WIDTH. */
+function deliveredSize(extension: string, raw: boolean, width?: number, height?: number) {
+  const ext = normalizeFormat(extension);
+  if (raw || PASSTHROUGH_FORMATS.has(ext) || !width || !height || width <= DELIVERY_MAX_WIDTH) return { width, height };
+  return { width: DELIVERY_MAX_WIDTH, height: Math.round((height * DELIVERY_MAX_WIDTH) / width) };
 }
 
 export function postUrl(slug: string): string {
@@ -131,7 +137,8 @@ export function linkContextFor(model: VaultModel, item: Post | Series, options: 
       const ref = images.get(`${raw ? "raw:" : ""}${target}`) ?? images.get(target);
       if (!ref?.hash || !ref.resolvedPath) return null;
       const extension = path.posix.extname(ref.resolvedPath);
-      return { url: imagePublicPath(ref.hash, extension, raw, base), width: ref.width, height: ref.height };
+      const size = deliveredSize(extension, raw, ref.width, ref.height);
+      return { url: imagePublicPath(ref.hash, extension, raw, base), ...size };
     },
     noteUrl(target) {
       const resolved = links.get(target);

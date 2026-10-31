@@ -8,4 +8,6 @@ export default defineConfig({
   integrations: [markvault()],
   devToolbar: { enabled: false },
   server: { port: 4321 },
+  // mermaid is large but only loaded on pages that contain a diagram.
+  vite: { build: { chunkSizeWarningLimit: 4096 } },
 });

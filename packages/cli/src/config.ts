@@ -5,6 +5,8 @@ import path from "node:path";
 export interface CliConfig {
   vault?: string;
   ignore?: string[];
+  /** Public site address, only used to print links after publishing. */
+  site_url?: string;
   cloudinary?: { cloud_name?: string; api_key?: string; api_secret?: string };
 }
 

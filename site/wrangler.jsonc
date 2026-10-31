@@ -1,13 +1,21 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "markvault",
+  "main": "./worker/index.ts",
   "compatibility_date": "2026-10-30",
-  // 阶段 2：只有静态资源。阶段 3、4 会加 main（/img、/api/paste）和 D1 绑定。
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "html_handling": "auto-trailing-slash"
+    "html_handling": "auto-trailing-slash",
+    // 只有这些路径会执行 Worker 脚本，其余全部是免费的静态资源请求。
+    "run_worker_first": ["/img/*"]
+  },
+  "vars": {
+    // CLOUDINARY_CLOUD 不写在这里（代码仓库是公开的），由 markvault deploy 用 --var 传入。
+    "IMG_REFERER_ALLOW": ""
   },
   "workers_dev": true,
-  "preview_urls": false
+  "preview_urls": false,
+  "observability": { "enabled": true }
 }
