@@ -21,6 +21,19 @@ server_flask/data/
 __pycache__/
 *.py[cod]
 
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# Local tool state
+.wrangler/
+.astro/
+.od-skills/
+.superpowers/
+.claude/settings.local.json
+
 # Editor and OS files
 .vscode/*
 !.vscode/extensions.json
