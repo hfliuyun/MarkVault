@@ -1,5 +1,7 @@
 # 仓库协作指南
 
+> **进行中：迁移到 Cloudflare。** 开始任何工作前，先读 `docs/migration-progress.md`（当前状态、下一步、待用户处理）和 `docs/specs/2026-11-01-cloudflare-migration-design.md`（设计）。本文件下面描述的是迁移前的旧架构，会在迁移第 6 阶段更新。每完成一个阶段或独立部分，都要更新 `docs/migration-progress.md`，并和代码放在同一个提交里。
+
 ## 项目结构与模块组织
 
 MarkVault 是一个 Markdown 优先的个人博客 / 知识库系统，由 Vue 3 前端和 Flask 后端组成。

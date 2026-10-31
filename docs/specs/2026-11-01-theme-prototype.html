@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MarkVault 主题原型</title>
+<script>
+  // 正式站点里这段内联在 <head> 最前面，避免主题闪烁
+  (function () {
+    // 原型额外支持 ?theme=paper|night|plain，方便截图对比
+    var pref = new URLSearchParams(location.search).get('theme') || localStorage.getItem('mv-theme') || 'auto';
+    var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = pref === 'auto' ? (dark ? 'night' : 'paper') : pref;
+    document.documentElement.dataset.themePref = pref;
+  })();
+</script>
+<style>
+/* ========== 主题令牌：组件只能使用这些变量 ========== */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Iowan Old Style", Charter, Georgia, "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, "PingFang SC", monospace;
+  --measure: 42rem;
+  --radius: 8px;
+}
+[data-theme="paper"] {
+  color-scheme: light;
+  --bg: #faf9f5; --surface: #f2f0e8; --surface-2: #ebe8dd;
+  --text: #1f1e1d; --text-2: #4d4c48; --muted: #6f6e67;
+  --border: #e3e0d6; --border-strong: #cfcbbf;
+  --accent: #b0532f; --accent-soft: #f3e3da;
+  --code-bg: #f2f0e8; --mark: #f6e7b3;
+  --heading-font: var(--font-serif);
+  --c-note: #3b6fb6; --c-tip: #3d8457; --c-warn: #b07b16; --c-danger: #b23b3b;
+}
+[data-theme="night"] {
+  color-scheme: dark;
+  --bg: #1f1e1c; --surface: #282724; --surface-2: #32302c;
+  --text: #ecebe5; --text-2: #c4c2b9; --muted: #9a988f;
+  --border: #36342f; --border-strong: #4a4740;
+  --accent: #e08a65; --accent-soft: #3a2a22;
+  --code-bg: #262522; --mark: #5a4a1c;
+  --heading-font: var(--font-serif);
+  --c-note: #7aa7e8; --c-tip: #7cc597; --c-warn: #e0b45a; --c-danger: #ec8a8a;
+}
+[data-theme="plain"] {
+  color-scheme: light;
+  --bg: #ffffff; --surface: #f5f6f8; --surface-2: #eceef2;
+  --text: #16181d; --text-2: #434852; --muted: #6b7079;
+  --border: #e6e8ec; --border-strong: #d0d4da;
+  --accent: #2f5fd0; --accent-soft: #e6edfb;
+  --code-bg: #f5f6f8; --mark: #fff1a8;
+  --heading-font: var(--font-sans);
+  --c-note: #2f5fd0; --c-tip: #2d8a55; --c-warn: #a86f00; --c-danger: #c03535;
+}
+
+/* ========== 基础 ========== */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.85 var(--font-sans);
+  transition: background-color .15s, color .15s;
+}
+@media (prefers-reduced-motion: reduce) { body { transition: none; } }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 24px; }
+.measure { max-width: var(--measure); margin-left: auto; margin-right: auto; }
+
+/* ========== 页头 ========== */
+.site-header { border-bottom: 1px solid var(--border); position: relative; }
+.menu-btn { display: none !important; }
+.site-header .wrap { height: 64px; display: flex; align-items: center; gap: 32px; }
+.brand { font: 600 19px/1 var(--heading-font); letter-spacing: .01em; }
+.nav { display: flex; gap: 22px; font-size: 15px; color: var(--text-2); }
+.nav a:hover, .nav a.active { color: var(--text); }
+.nav a.active { box-shadow: inset 0 -2px 0 var(--accent); padding-bottom: 2px; }
+.tools { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.icon-btn {
+  height: 34px; min-width: 34px; padding: 0 10px; border: 0; border-radius: var(--radius);
+  background: transparent; color: var(--text-2); font: 14px var(--font-sans); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.icon-btn:hover { background: var(--surface); color: var(--text); }
+.kbd { font: 12px var(--font-mono); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
+.theme-menu { position: relative; }
+.theme-pop {
+  position: absolute; right: 0; top: 40px; width: 200px; padding: 6px; z-index: 10;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.08); display: none;
+}
+.theme-pop.open { display: block; }
+.theme-pop button {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--text);
+  font: 14px var(--font-sans); cursor: pointer; text-align: left;
+}
+.theme-pop button:hover { background: var(--surface); }
+.theme-pop button[aria-checked="true"]::after { content: "✓"; margin-left: auto; color: var(--accent); }
+.swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border-strong); }
+
+/* ========== 首页 ========== */
+.intro { padding: 72px 0 40px; }
+.intro h1 { font: 500 2.4rem/1.25 var(--heading-font); margin: 0 0 14px; letter-spacing: -.01em; }
+.intro p { margin: 0; color: var(--text-2); font-size: 18px; }
+.year { font: 500 15px var(--font-sans); color: var(--muted); margin: 40px 0 8px; letter-spacing: .05em; }
+.post-list { list-style: none; margin: 0; padding: 0; }
+.post-item { display: grid; grid-template-columns: 4.5rem 1fr; gap: 0 20px; padding: 18px 0; border-top: 1px solid var(--border); }
+.post-item:last-child { border-bottom: 1px solid var(--border); }
+.post-item time { color: var(--muted); font: 14px/1.9 var(--font-mono); font-variant-numeric: tabular-nums; }
+.post-item h2 { margin: 0; font: 500 1.2rem/1.5 var(--heading-font); }
+.post-item a:hover h2 { color: var(--accent); }
+.post-item p { margin: 4px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.chip { display: inline-block; font-size: 12.5px; line-height: 1; padding: 5px 8px; margin-top: 8px;
+  border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.more { display: inline-block; margin: 32px 0 80px; color: var(--accent); font-size: 15px; }
+
+/* ========== 文章页 ========== */
+.post-layout { display: grid; grid-template-columns: minmax(0, var(--measure)) 14rem; gap: 64px; justify-content: center; padding: 56px 0 96px; }
+.eyebrow { font-size: 14px; color: var(--accent); margin: 0 0 14px; }
+.post-title { font: 500 2.25rem/1.3 var(--heading-font); margin: 0 0 16px; letter-spacing: -.01em; }
+.meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; padding-bottom: 28px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.meta a:hover { color: var(--accent); }
+
+.prose { font-size: 17px; }
+.prose h2 { font: 500 1.5rem/1.4 var(--heading-font); margin: 2.4em 0 .7em; }
+.prose h3 { font: 600 1.15rem/1.5 var(--font-sans); margin: 2em 0 .5em; }
+.prose p, .prose ul, .prose ol, .prose .table-wrap, .prose pre, .prose blockquote, .prose figure, .prose .callout, .prose .code { margin: 0 0 1.15em; }
+h1, h2, h3 { text-wrap: balance; }
+.prose a { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.prose a:hover { color: var(--accent); }
+.prose strong { font-weight: 600; }
+.prose mark { background: var(--mark); color: inherit; padding: 0 2px; border-radius: 2px; }
+.prose code { font: .88em var(--font-mono); background: var(--surface); padding: .15em .4em; border-radius: 4px; }
+.prose hr { border: 0; text-align: center; margin: 2.4em 0; }
+.prose hr::before { content: "· · ·"; color: var(--muted); letter-spacing: .5em; }
+.prose blockquote { border-left: 3px solid var(--border-strong); padding: 2px 0 2px 18px; color: var(--text-2); }
+
+.code { position: relative; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.code pre { margin: 0; padding: 16px 18px; overflow-x: auto; font: 14px/1.7 var(--font-mono); }
+.code pre code { background: none; padding: 0; font-size: inherit; }
+.code .lang { position: absolute; top: 8px; right: 12px; font: 12px var(--font-mono); color: var(--muted); }
+.code .copy { position: absolute; top: 6px; right: 8px; opacity: 0; border: 1px solid var(--border); background: var(--bg); color: var(--text-2);
+  font: 12px var(--font-sans); padding: 3px 8px; border-radius: 6px; cursor: pointer; }
+.code:hover .copy { opacity: 1; } .code:hover .lang { opacity: 0; }
+.tok-k { color: var(--accent); } .tok-c { color: var(--muted); } .tok-s { color: var(--c-tip); }
+
+.prose .table-wrap { overflow-x: auto; }
+.prose table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.prose th, .prose td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.prose th { font-weight: 600; border-bottom: 1.5px solid var(--border-strong); white-space: nowrap; }
+
+.prose figure { text-align: center; }
+.prose figure .img { height: 220px; border-radius: 6px; border: 1px solid var(--border);
+  background: repeating-linear-gradient(135deg, var(--surface) 0 12px, var(--surface-2) 12px 24px); }
+.prose figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+
+.callout { --c: var(--c-note); border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 7%, var(--bg)); border-radius: 0 var(--radius) var(--radius) 0; padding: 12px 18px; }
+.callout.tip { --c: var(--c-tip); } .callout.warn { --c: var(--c-warn); } .callout.danger { --c: var(--c-danger); }
+.callout-title { font-weight: 600; color: var(--c); margin-bottom: 2px; font-size: 15px; }
+.callout p:last-child { margin: 0; }
+.math { text-align: center; font: italic 1.1em var(--font-serif); margin: 1.2em 0; }
+
+.series-box { margin-top: 56px; border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+.series-box h3 { margin: 0 0 4px; font: 500 1.1rem var(--heading-font); }
+.series-box .sub { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.series-box ol { margin: 0; padding-left: 1.4em; font-size: 15px; line-height: 2.1; }
+.series-box li.current { color: var(--accent); font-weight: 500; }
+.series-box li a:hover { color: var(--accent); }
+.prev-next { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+.prev-next a { border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 15px; }
+.prev-next a:hover { border-color: var(--border-strong); background: var(--surface); }
+.prev-next small { display: block; color: var(--muted); font-size: 13px; }
+.prev-next a:last-child { text-align: right; }
+
+.toc { position: sticky; top: 32px; align-self: start; font-size: 13.5px; line-height: 1.6; }
+.toc-title { font-size: 12px; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
+.toc a { display: block; padding: 4px 0 4px 12px; border-left: 2px solid var(--border); color: var(--muted); }
+.toc a.l3 { padding-left: 24px; }
+.toc a:hover { color: var(--text); }
+.toc a.active { color: var(--text); border-left-color: var(--accent); }
+.toc-inline { display: none; margin: 20px 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; font-size: 15px; }
+.toc-inline summary { cursor: pointer; color: var(--text-2); }
+
+/* ========== Paste ========== */
+.paste { padding: 56px 0 96px; }
+.paste h1 { font: 500 1.9rem var(--heading-font); margin: 0 0 6px; }
+.paste .lead { color: var(--text-2); margin: 0 0 24px; font-size: 15px; }
+.composer { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); }
+.composer textarea { width: 100%; min-height: 160px; border: 0; resize: vertical; padding: 16px 18px; background: transparent; color: var(--text); font: 14px/1.7 var(--font-mono); outline: none; }
+.composer:focus-within { border-color: var(--border-strong); box-shadow: 0 0 0 3px var(--accent-soft); }
+.composer-bar { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface); font-size: 14px; }
+.composer-bar select { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 6px; padding: 5px 8px; font: 13px var(--font-sans); }
+.btn-primary { margin-left: auto; border: 0; border-radius: 8px; padding: 7px 16px; background: var(--text); color: var(--bg); font: 500 14px var(--font-sans); cursor: pointer; }
+.paste-list { list-style: none; padding: 0; margin: 32px 0 0; }
+.paste-item { display: flex; gap: 16px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--border); }
+.paste-item .body { min-width: 0; flex: 1; }
+.paste-item .snippet { font: 13.5px/1.6 var(--font-mono); color: var(--text); white-space: pre-wrap; overflow: hidden; max-height: 3.2em; }
+.paste-item .info { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.btn-ghost { border: 1px solid var(--border); background: var(--bg); color: var(--text-2); border-radius: 8px; padding: 5px 12px; font: 13px var(--font-sans); cursor: pointer; white-space: nowrap; }
+.btn-ghost:hover { border-color: var(--border-strong); color: var(--text); }
+
+.site-footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+.site-footer .wrap { padding-top: 28px; padding-bottom: 40px; display: flex; justify-content: space-between; }
+
+.view { display: none; } .view.on { display: block; }
+
+/* ========== 窄屏 ========== */
+@media (max-width: 1100px) {
+  .post-layout { grid-template-columns: minmax(0, var(--measure)); }
+  .toc { display: none; }
+  .toc-inline { display: block; }
+}
+@media (max-width: 720px) {
+  body { font-size: 16.5px; }
+  .wrap { padding: 0 18px; }
+  .nav { display: none; }
+  .nav.open { display: flex; position: absolute; top: 64px; left: 0; right: 0; z-index: 9; flex-direction: column; gap: 0;
+    background: var(--bg); border-bottom: 1px solid var(--border); padding: 8px 18px 16px; }
+  .nav.open a { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .nav.open a.active { box-shadow: none; color: var(--accent); }
+  .menu-btn { display: inline-flex !important; }
+  .kbd { display: none; }
+  .intro { padding: 48px 0 24px; }
+  .intro h1 { font-size: 1.9rem; }
+  .post-title { font-size: 1.75rem; }
+  .post-item { grid-template-columns: 1fr; }
+  .post-item time { order: -1; font-size: 13px; }
+  .prev-next { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#home">MarkVault</a>
+    <nav class="nav" id="nav">
+      <a href="#home" data-nav="home">文章</a>
+      <a href="#post" data-nav="post">系列</a>
+      <a href="#home">分类</a>
+      <a href="#home">标签</a>
+      <a href="#home">关于</a>
+    </nav>
+    <div class="tools">
+      <button class="icon-btn" title="搜索">搜索 <span class="kbd">⌘K</span></button>
+      <a class="icon-btn" href="#paste" data-nav="paste">Paste</a>
+      <div class="theme-menu">
+        <button class="icon-btn" id="themeBtn" title="主题" aria-haspopup="true">◐</button>
+        <div class="theme-pop" id="themePop" role="menu">
+          <button role="menuitemradio" data-pref="auto"><span class="swatch" style="background:linear-gradient(90deg,#faf9f5 50%,#1f1e1c 50%)"></span>跟随系统</button>
+          <button role="menuitemradio" data-pref="paper"><span class="swatch" style="background:#faf9f5"></span>纸 · 暖白</button>
+          <button role="menuitemradio" data-pref="night"><span class="swatch" style="background:#1f1e1c"></span>夜 · 暖黑</button>
+          <button role="menuitemradio" data-pref="plain"><span class="swatch" style="background:#fff;box-shadow:inset 0 0 0 5px #2f5fd0"></span>素 · 冷白</button>
+        </div>
+      </div>
+      <button class="icon-btn menu-btn" id="menuBtn" title="菜单" aria-controls="nav" aria-expanded="false">☰</button>
+    </div>
+  </div>
+</header>
+
+<!-- ========== 首页 ========== -->
+<main class="view wrap" id="view-home">
+  <section class="intro measure">
+    <h1>写给未来的自己</h1>
+    <p>记录音视频、机器学习和折腾博客的过程。</p>
+  </section>
+
+  <div class="measure">
+    <div class="year">2026</div>
+    <ul class="post-list">
+      <li class="post-item">
+        <time>08-01</time>
+        <a href="#post"><h2>Sub2API 部署实战：Fedora + Podman，把多个模型渠道整合成一个 API</h2>
+        <p>Sub2API 聚合部署的完整过程。</p></a>
+      </li>
+      <li class="post-item">
+        <time>07-02</time>
+        <a href="#post"><h2>视频底层密码：YUV 颜色空间、内存对齐与格式转换揭秘</h2>
+        <p>深入剖析 YUV 颜色空间的核心原理，拆解 4:2:0 采样机制，彻底搞懂 Planar / Semi-Planar / Packed 内存布局。</p>
+        <span class="chip">音视频数据流基础 · 3</span></a>
+      </li>
+      <li class="post-item">
+        <time>07-02</time>
+        <a href="#post"><h2>音视频容器格式剖析：MP4、FLV 与 TS</h2>
+        <p>解析 MP4 Box 树状模型与 stbl 核心索引表，剖析 FLV Tag 结构和 MPEG-TS 的分包方式。</p>
+        <span class="chip">音视频数据流基础 · 4</span></a>
+      </li>
+      <li class="post-item">
+        <time>06-30</time>
+        <a href="#post"><h2>音频流基础：PCM、WAV 与 AAC 编码深度解析</h2>
+        <p>从音频采集全链路出发，深入剖析 PCM 裸数据的物理意义与计算、WAV 容器结构，以及 AAC 编码原理与 ADTS 帧头字段级解析。</p>
+        <span class="chip">音视频数据流基础 · 2</span></a>
+      </li>
+      <li class="post-item">
+        <time>06-24</time>
+        <a href="#post"><h2>H264 流</h2>
+        <p>从音视频流转全链路出发，深入剖析 H.264 裸流的底层结构，包括 NALU、起始码、SPS/PPS 参数集及 I/P/B 帧的预测机制。</p>
+        <span class="chip">音视频数据流基础 · 1</span></a>
+      </li>
+    </ul>
+    <div class="year">2022</div>
+    <ul class="post-list">
+      <li class="post-item">
+        <time>01-29</time>
+        <a href="#post"><h2>逻辑回归</h2><p>逻辑回归的基本原理、损失函数和梯度推导。</p></a>
+      </li>
+    </ul>
+    <a class="more" href="#home">更早的文章 →</a>
+  </div>
+</main>
+
+<!-- ========== 文章页 ========== -->
+<main class="view wrap" id="view-post">
+  <div class="post-layout">
+    <article>
+      <p class="eyebrow">音视频数据流基础 · 第 2 篇</p>
+      <h1 class="post-title">音频流基础：PCM、WAV 与 AAC 编码深度解析</h1>
+      <div class="meta">
+        <span>2026-06-30</span><span>约 18 分钟</span>
+        <span><a href="#home">#AAC</a> <a href="#home">#PCM</a> <a href="#home">#ADTS</a></span>
+      </div>
+
+      <details class="toc-inline"><summary>目录</summary>
+        <div>1. 音频流转全链路回顾<br>2. 探秘声音的数字躯壳：PCM<br>3. AAC 编码</div>
+      </details>
+
+      <div class="prose">
+        <h2 id="s1">1. 音频流转全链路回顾</h2>
+        <p>在开始枯燥的参数解析之前，我们先在脑海中建立音频数据流转的宏观链路。从你对着麦克风说话，到观众在耳机里听到声音，音频数据经历了如下蜕变：</p>
+        <div class="code"><span class="lang">text</span><button class="copy">复制</button><pre><code>麦克风采集
+  → 得到 PCM 原始音频（体积巨大）
+  → 送入编码器进行 AAC 压缩（体积骤减）
+  → 封装为 ADTS 裸流，或装进 MP4 / FLV 等容器
+  → 网络传输 → 解封装 → AAC 解码 → 声卡播放</code></pre></div>
+        <p>在这个链路中，<strong>PCM</strong> 是声音最原始的物理切片，而 <strong>AAC</strong> 则是为了网络传输而发明的<mark>“听觉欺骗”</mark>压缩魔法。</p>
+
+        <hr>
+
+        <h2 id="s2">2. 探秘声音的数字躯壳：PCM</h2>
+        <p><strong>PCM（Pulse Code Modulation，脉冲编码调制）</strong>是一种将连续的模拟声波，转换为计算机能够理解的离散数字样本的方法。</p>
+        <h3 id="s21">2.1 采样定理与核心参数</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>参数</th><th>含义</th><th>常见取值</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Sample Rate</strong></td><td>一秒钟内对声波进行多少次切片记录</td><td>44100 Hz、48000 Hz</td></tr>
+            <tr><td><strong>Bit Depth</strong></td><td>每次切片用多少 bit 表示振幅</td><td>16-bit、24-bit</td></tr>
+            <tr><td><strong>Channels</strong></td><td>同时记录多少条独立的声音轨迹</td><td>1、2</td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout tip">
+          <div class="callout-title">为什么 CD 的采样率是 44.1 kHz？</div>
+          <p>根据奈奎斯特-香农采样定理，采样率必须大于等于信号最高频率的 2 倍。人耳上限约 20 kHz，所以至少 40 kHz。</p>
+        </div>
+        <p>一秒钟 PCM 数据的体积可以直接算出来：</p>
+        <div class="math">Size = SampleRate × BitDepth × Channels ÷ 8</div>
+        <div class="code"><span class="lang">python</span><button class="copy">复制</button><pre><code><span class="tok-k">def</span> pcm_bytes_per_second(rate, bits, channels):
+    <span class="tok-c"># 44100 × 16 × 2 ÷ 8 = 176400 B/s</span>
+    <span class="tok-k">return</span> rate * bits * channels // <span class="tok-s">8</span></code></pre></div>
+        <figure><div class="img"></div><figcaption>图 1　PCM 采样与量化示意</figcaption></figure>
+        <blockquote><p>位深越高，量化噪声越小，记录的声音细节越丰富。</p></blockquote>
+        <div class="callout warn">
+          <div class="callout-title">注意</div>
+          <p>WAV 只是容器，里面装的通常就是未压缩的 PCM 数据。</p>
+        </div>
+
+        <h2 id="s3">3. AAC 编码</h2>
+        <p>AAC 利用人耳的听觉掩蔽效应，丢掉听不见的部分，再用 <code>MDCT</code> 变换和熵编码把体积压到原来的十分之一左右。</p>
+      </div>
+
+      <section class="series-box">
+        <h3>音视频数据流基础</h3>
+        <p class="sub">共 5 篇</p>
+        <ol>
+          <li><a href="#post">H264 流</a></li>
+          <li class="current">音频流基础：PCM、WAV 与 AAC 编码深度解析</li>
+          <li><a href="#post">视频底层密码：YUV 颜色空间、内存对齐与格式转换揭秘</a></li>
+          <li><a href="#post">音视频容器格式剖析：MP4、FLV 与 TS</a></li>
+          <li><a href="#post">FFMpeg 命令记录</a></li>
+        </ol>
+      </section>
+      <nav class="prev-next">
+        <a href="#post"><small>← 上一篇</small>H264 流</a>
+        <a href="#post"><small>下一篇 →</small>视频底层密码：YUV 颜色空间</a>
+      </nav>
+    </article>
+
+    <aside class="toc">
+      <div class="toc-title">目录</div>
+      <a href="#s1" class="active">1. 音频流转全链路回顾</a>
+      <a href="#s2">2. 探秘声音的数字躯壳：PCM</a>
+      <a href="#s21" class="l3">2.1 采样定理与核心参数</a>
+      <a href="#s3">3. AAC 编码</a>
+    </aside>
+  </div>
+</main>
+
+<!-- ========== Paste ========== -->
+<main class="view wrap" id="view-paste">
+  <section class="paste measure">
+    <h1>Paste</h1>
+    <p class="lead">在这台设备上已信任 · MacBook Pro</p>
+    <div class="composer">
+      <textarea placeholder="粘贴文本或代码，⌘↵ 保存"></textarea>
+      <div class="composer-bar">
+        <select><option>自动识别</option><option>bash</option><option>python</option></select>
+        <select><option>1 天后过期</option><option>1 小时</option><option>1 周</option><option>永不</option></select>
+        <button class="btn-primary">保存</button>
+      </div>
+    </div>
+    <ul class="paste-list">
+      <li class="paste-item">
+        <div class="body"><div class="snippet">ffmpeg -i input.mp4 -c:v copy -bsf:v h264_mp4toannexb -an out.h264</div>
+          <div class="info">bash · 3 分钟前 · iPhone</div></div>
+        <button class="btn-ghost">复制</button><button class="btn-ghost">链接</button>
+      </li>
+      <li class="paste-item">
+        <div class="body"><div class="snippet">https://developers.cloudflare.com/workers/static-assets/</div>
+          <div class="info">text · 2 小时前 · MacBook Pro</div></div>
+        <button class="btn-ghost">复制</button><button class="btn-ghost">链接</button>
+      </li>
+    </ul>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap"><span>© 2026 MarkVault</span><span>用 Obsidian 写作 · 部署在 Cloudflare</span></div>
+</footer>
+
+<script>
+  // 视图切换（仅原型用）
+  function show() {
+    var v = (location.hash || '#home').slice(1);
+    if (!['home', 'post', 'paste'].includes(v)) v = 'home';
+    document.querySelectorAll('.view').forEach(function (el) { el.classList.toggle('on', el.id === 'view-' + v); });
+    document.querySelectorAll('[data-nav]').forEach(function (el) { el.classList.toggle('active', el.dataset.nav === v); });
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', show); show();
+
+  // 主题切换（正式站点使用同样的逻辑）
+  var pop = document.getElementById('themePop');
+  var media = window.matchMedia('(prefers-color-scheme: dark)');
+  function apply(pref) {
+    localStorage.setItem('mv-theme', pref);
+    document.documentElement.dataset.themePref = pref;
+    document.documentElement.dataset.theme = pref === 'auto' ? (media.matches ? 'night' : 'paper') : pref;
+    pop.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.pref === pref)); });
+  }
+  apply(document.documentElement.dataset.themePref);
+  media.addEventListener('change', function () { if (document.documentElement.dataset.themePref === 'auto') apply('auto'); });
+  document.getElementById('themeBtn').addEventListener('click', function (e) { e.stopPropagation(); pop.classList.toggle('open'); });
+  pop.addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { apply(b.dataset.pref); pop.classList.remove('open'); } });
+  document.addEventListener('click', function () { pop.classList.remove('open'); });
+
+  // 窄屏菜单
+  var nav = document.getElementById('nav'), menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = nav.classList.toggle('open');
+    menuBtn.setAttribute('aria-expanded', String(open));
+  });
+  nav.addEventListener('click', function () { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); });
+</script>
+</body>
+</html>
