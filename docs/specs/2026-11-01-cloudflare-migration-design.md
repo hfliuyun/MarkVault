@@ -210,12 +210,16 @@ remark-parse → remark-gfm → remark-math → remark-obsidian（自定义）
 - `series` 指向的笔记不存在、没有发布，或者不是 `type: series`
 - 引用的图片既不在本地，也不在 `images.json` 里
 - `legacy.abbrlinks` 里同一个 abbrlink 指向了两篇文章
+- 图片路径里有未编码的空格（CommonMark 不认，需要写成 `%20` 或改用 `![[...]]`）
+- 已发布笔记的 frontmatter 无法解析
 
 警告：
 
 - wikilink 指向了未发布的笔记
 - 出现未知的 frontmatter 字段
 - 之前发布过的 slug 这次不见了（判断依据是 `.markvault/published.json` 里的记录），并且没有写进任何文章的 `redirect_from`。这通常说明你改了 slug，或者删了一篇文章，旧 URL 会变成 404。
+- 还有没迁移的旧格式文章（有 `slug`、没有 `publish`）
+- frontmatter 前面有空行，因此不会被识别
 
 ## 4. 图片
 
@@ -488,7 +492,7 @@ MarkVault/
 ├── packages/
 │   ├── content/              内容层：扫描、解析、校验、渲染、图片清单
 │   │   ├── scan.ts           找出 publish: true 的笔记，建立文件名 → 笔记的映射
-│   │   ├── schema.ts         frontmatter 校验（zod）
+│   │   ├── schema.ts         frontmatter 字段校验（手写，规则见 3.2、3.5）
 │   │   ├── model.ts          文章、系列、分类、标签、旧链接索引
 │   │   ├── render/           unified 管线和 remark-obsidian
 │   │   └── images.ts         图片引用解析、hash、images.json 读写
@@ -692,6 +696,14 @@ site/src/styles/
   - `slug`、`date`、`legacy` 保持不变。
   - 不在 `posts/*/`、`series/*/*/` 下面的笔记（比如 `2026-09-09.md`）不加 `publish`，也就不会被发布。
 - 验收标准：`markvault check` 没有报错；新旧两套系统列出的文章 slug 集合完全一致。
+
+实现补充：
+- `markvault migrate` 默认只预览，加 `--apply` 才写入；计划中有任何错误时什么都不改。
+- 没有 README 的系列会新建一篇空的系列笔记，放在第一篇文章所在目录的上一级。
+- 迁移后的文件名和 vault 里已有的笔记重名时，加上 ` (<slug>)` 后缀，保证 wikilink 不会有歧义。
+- 系列标题取当前线上实际显示的那个（`series/<id>/README.md` 的 title，否则取第一篇文章的 `series.title`），不一致的地方在预览里列出来。
+- frontmatter 前面有空行的笔记（旧系统和 Obsidian 都不识别）会报错，要先手动修正。
+- `.markvault/published.json` 的"slug 消失"警告要依赖 publish 写入的记录，放到阶段 2 实现 `publish` 时一起做。
 
 ### 阶段 2：Astro 站点
 

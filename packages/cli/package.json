@@ -1,0 +1,13 @@
+{
+  "name": "@markvault/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "markvault command: check, migrate, publish.",
+  "bin": {
+    "markvault": "./src/main.ts"
+  },
+  "dependencies": {
+    "@markvault/content": "*"
+  }
+}
