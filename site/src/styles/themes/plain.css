@@ -1,0 +1,22 @@
+/* 素：冷白底、蓝色强调色、无衬线标题。 */
+[data-theme="plain"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #f5f6f8;
+  --surface-2: #eceef2;
+  --text: #16181d;
+  --text-2: #434852;
+  --muted: #6b7079;
+  --border: #e6e8ec;
+  --border-strong: #d0d4da;
+  --accent: #2f5fd0;
+  --accent-soft: #e6edfb;
+  --code-bg: #f5f6f8;
+  --mark: #fff1a8;
+  --heading-font: var(--font-sans);
+  --c-note: #2f5fd0;
+  --c-tip: #2d8a55;
+  --c-warn: #a86f00;
+  --c-danger: #c03535;
+  --shadow-pop: 0 8px 24px rgba(22, 24, 29, 0.08);
+}

@@ -1,0 +1,71 @@
+---
+import "../styles/base.css";
+import "../styles/themes/paper.css";
+import "../styles/themes/night.css";
+import "../styles/themes/plain.css";
+import "../styles/prose.css";
+import "../styles/components.css";
+import SiteHeader from "../components/SiteHeader.astro";
+import { SITE, type NavKey } from "../site.config";
+
+interface Props {
+  title?: string;
+  description?: string;
+  nav?: NavKey;
+}
+
+const { title, description = SITE.description, nav = "none" } = Astro.props;
+const fullTitle = title ? `${title} · ${SITE.title}` : SITE.title;
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="paper">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      // 1. 旧站是 hash 路由：/#/posts/x → /posts/x/
+      (function () {
+        var hash = location.hash;
+        if (hash.indexOf("#/") !== 0) return;
+        var target = hash.slice(1);
+        var cut = target.indexOf("?");
+        var pathPart = cut < 0 ? target : target.slice(0, cut);
+        var query = cut < 0 ? "" : target.slice(cut);
+        if (pathPart === "/manage" || pathPart.indexOf("/manage/") === 0) pathPart = "/";
+        var bare = /^\/(p|paste)\/[^/]+$/.test(pathPart);
+        if (!bare && pathPart.slice(-1) !== "/") pathPart += "/";
+        location.replace(pathPart + query);
+      })();
+      // 2. 在绘制前设置主题，避免闪烁
+      (function () {
+        var pref = "auto";
+        try {
+          pref = localStorage.getItem("mv-theme") || "auto";
+        } catch (e) {}
+        var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var root = document.documentElement;
+        root.dataset.themePref = pref;
+        root.dataset.theme = pref === "auto" ? (dark ? "night" : "paper") : pref;
+      })();
+    </script>
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="visually-hidden" href="#main">跳到正文</a>
+    <SiteHeader nav={nav} />
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <span>© {new Date().getFullYear()} {SITE.title}</span>
+        <span>{SITE.footer}</span>
+      </div>
+    </footer>
+  </body>
+</html>

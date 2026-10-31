@@ -1,0 +1,13 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "markvault",
+  "compatibility_date": "2026-10-30",
+  // 阶段 2：只有静态资源。阶段 3、4 会加 main（/img、/api/paste）和 D1 绑定。
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "workers_dev": true,
+  "preview_urls": false
+}

@@ -1,0 +1,264 @@
+/* 正文元素（设计文档 8.5） */
+.prose {
+  font-size: 17px;
+  overflow-wrap: break-word;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose h2 {
+  font: 500 1.5rem/1.4 var(--heading-font);
+  margin: 2.4em 0 0.7em;
+}
+.prose h3 {
+  font: 600 1.15rem/1.5 var(--font-sans);
+  margin: 2em 0 0.5em;
+}
+.prose h4,
+.prose h5,
+.prose h6 {
+  font: 600 1rem/1.6 var(--font-sans);
+  margin: 1.6em 0 0.4em;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose .table-wrap,
+.prose pre,
+.prose blockquote,
+.prose figure,
+.prose .callout,
+.prose .katex-display {
+  margin: 0 0 1.15em;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.5em;
+}
+.prose li > ul,
+.prose li > ol {
+  margin-bottom: 0;
+}
+.prose li + li {
+  margin-top: 0.2em;
+}
+.prose .contains-task-list {
+  list-style: none;
+  padding-left: 0.4em;
+}
+.prose .task-list-item input {
+  margin: 0 0.5em 0 0;
+  accent-color: var(--accent);
+}
+
+.prose a {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.prose a:hover {
+  color: var(--accent);
+}
+.prose strong {
+  font-weight: 600;
+}
+.prose mark {
+  background: var(--mark);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.prose :not(pre) > code {
+  font: 0.88em var(--font-mono);
+  background: var(--surface);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.prose hr {
+  border: 0;
+  text-align: center;
+  margin: 2.4em 0;
+}
+.prose hr::before {
+  content: "· · ·";
+  color: var(--muted);
+  letter-spacing: 0.5em;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--border-strong);
+  padding: 2px 0 2px 18px;
+  color: var(--text-2);
+}
+.prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* 代码块：Shiki 输出 pre.shiki，主题决定用哪组颜色变量 */
+.prose pre {
+  position: relative;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font: 14px/1.7 var(--font-mono);
+  tab-size: 4;
+}
+.prose pre code {
+  font: inherit;
+  background: none;
+  padding: 0;
+}
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+}
+.prose pre.shiki {
+  background: var(--code-bg) !important;
+}
+.code-block {
+  position: relative;
+}
+.code-block[data-lang]:not([data-lang="text"])::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font: 12px var(--font-mono);
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 1;
+}
+.code-copy {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  opacity: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-2);
+  font: 12px var(--font-sans);
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.code-block:hover .code-copy,
+.code-copy:focus-visible {
+  opacity: 1;
+}
+.code-block:hover::before {
+  opacity: 0;
+}
+@media (hover: none) {
+  .code-copy {
+    opacity: 1;
+  }
+  .code-block::before {
+    display: none;
+  }
+}
+
+.prose pre.mermaid {
+  background: transparent;
+  border: 0;
+  text-align: center;
+  font-family: var(--font-sans);
+}
+
+.prose .table-wrap {
+  overflow-x: auto;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.prose th,
+.prose td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.prose th {
+  font-weight: 600;
+  border-bottom: 1.5px solid var(--border-strong);
+  white-space: nowrap;
+}
+
+.prose figure {
+  text-align: center;
+}
+.prose figure img {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.prose figcaption {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.prose .callout {
+  --c: var(--c-note);
+  border-left: 3px solid var(--c);
+  background: color-mix(in srgb, var(--c) 7%, var(--bg));
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 18px;
+}
+.prose .callout-tip {
+  --c: var(--c-tip);
+}
+.prose .callout-warn {
+  --c: var(--c-warn);
+}
+.prose .callout-danger {
+  --c: var(--c-danger);
+}
+.prose .callout-title {
+  font-weight: 600;
+  color: var(--c);
+  font-size: 15px;
+  margin: 0 0 2px;
+}
+.prose summary.callout-title {
+  cursor: pointer;
+}
+.prose details.callout:not([open]) .callout-title {
+  margin: 0;
+}
+.prose .callout-body > :last-child {
+  margin-bottom: 0;
+}
+
+.prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+.prose .katex {
+  font-size: 1.05em;
+}
+
+.prose .footnotes {
+  margin-top: 3em;
+  padding-top: 1em;
+  border-top: 1px solid var(--border);
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+@media (max-width: 720px) {
+  .prose {
+    font-size: 16.5px;
+  }
+}

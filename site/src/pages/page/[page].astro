@@ -1,0 +1,17 @@
+---
+import HomePage from "../../components/HomePage.astro";
+import { SITE } from "../../site.config";
+import { getVault } from "../../lib/vault";
+
+export async function getStaticPaths() {
+  const model = await getVault();
+  const totalPages = Math.ceil(model.posts.length / SITE.postsPerPage);
+  return Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => ({
+    params: { page: String(index + 2) },
+  }));
+}
+
+const page = Number(Astro.params.page);
+---
+
+<HomePage page={page} />

@@ -1,0 +1,11 @@
+---
+import TermDetail from "../../components/TermDetail.astro";
+import { getVault, taxonomy } from "../../lib/vault";
+
+export async function getStaticPaths() {
+  const model = await getVault();
+  return taxonomy(model.posts, "tags").map(([name]) => ({ params: { name }, props: { name } }));
+}
+---
+
+<TermDetail field="tags" name={Astro.props.name} />

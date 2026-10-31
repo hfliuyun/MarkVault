@@ -1,0 +1,20 @@
+{
+  "name": "@markvault/site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && pagefind --site dist",
+    "preview": "wrangler dev"
+  },
+  "dependencies": {
+    "@markvault/content": "*",
+    "astro": "^7.4.4",
+    "katex": "^0.16.47",
+    "mermaid": "^12.2.0"
+  },
+  "devDependencies": {
+    "pagefind": "^1.5.2",
+    "wrangler": "^4.156.0"
+  }
+}

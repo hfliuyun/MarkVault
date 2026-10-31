@@ -1,0 +1,40 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostList from "./PostList.astro";
+import { SITE } from "../site.config";
+import { getVault } from "../lib/vault";
+
+interface Props {
+  page: number;
+}
+const { page } = Astro.props;
+const model = await getVault();
+const size = SITE.postsPerPage;
+const totalPages = Math.max(1, Math.ceil(model.posts.length / size));
+const posts = model.posts.slice((page - 1) * size, page * size);
+const newer = page > 1 ? (page === 2 ? "/" : `/page/${page - 1}/`) : null;
+const older = page < totalPages ? `/page/${page + 1}/` : null;
+---
+
+<BaseLayout title={page > 1 ? `第 ${page} 页` : undefined} nav="home">
+  <div class="wrap">
+    {page === 1 ? (
+      <section class="page-head intro measure">
+        <h1>{SITE.intro.heading}</h1>
+        <p>{SITE.intro.text}</p>
+      </section>
+    ) : (
+      <section class="page-head measure">
+        <h1>文章</h1>
+        <p>第 {page} 页，共 {totalPages} 页</p>
+      </section>
+    )}
+    <div class="measure">
+      {posts.length > 0 ? <PostList posts={posts} /> : <p class="empty">还没有文章。</p>}
+      <nav class="pager" aria-label="分页">
+        <span>{newer && <a href={newer}>← 较新的文章</a>}</span>
+        <span>{older && <a href={older}>更早的文章 →</a>}</span>
+      </nav>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,90 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="搜索" nav="search">
+  <div class="wrap">
+    <section class="page-head measure">
+      <h1>搜索</h1>
+    </section>
+    <div class="measure">
+      <form id="search-form" role="search" onsubmit="return false">
+        <label class="visually-hidden" for="search-input">搜索文章</label>
+        <input id="search-input" class="search-box" type="search" placeholder="输入关键词，例如 H.264、采样率" autocomplete="off" autofocus />
+      </form>
+      <p class="search-status" id="search-status" aria-live="polite"></p>
+      <ul class="search-results" id="search-results"></ul>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  interface PagefindResult {
+    data(): Promise<{ url: string; excerpt: string; meta: { title?: string } }>;
+  }
+  interface Pagefind {
+    init(): Promise<void>;
+    search(query: string): Promise<{ results: PagefindResult[] }>;
+  }
+
+  const input = document.getElementById("search-input") as HTMLInputElement;
+  const status = document.getElementById("search-status")!;
+  const list = document.getElementById("search-results")!;
+  let pagefind: Pagefind | null = null;
+  let latest = 0;
+  let timer: number | undefined;
+
+  async function load(): Promise<Pagefind | null> {
+    if (pagefind) return pagefind;
+    try {
+      const path = "/pagefind/pagefind.js";
+      pagefind = (await import(/* @vite-ignore */ path)) as Pagefind;
+      await pagefind.init();
+    } catch (error) {
+      console.error("pagefind load failed", error);
+      status.textContent = "搜索索引还没有生成（本地预览时没有索引，构建后才有）。";
+    }
+    return pagefind;
+  }
+
+  function escapeText(text: string): string {
+    const span = document.createElement("span");
+    span.textContent = text;
+    return span.innerHTML;
+  }
+
+  async function run(query: string) {
+    const url = new URL(location.href);
+    if (query) url.searchParams.set("q", query);
+    else url.searchParams.delete("q");
+    history.replaceState(null, "", url);
+
+    if (!query.trim()) {
+      list.innerHTML = "";
+      status.textContent = "";
+      return;
+    }
+    const engine = await load();
+    if (!engine) return;
+    const ticket = ++latest;
+    const search = await engine.search(query);
+    if (ticket !== latest) return; // a newer query is running
+    const results = await Promise.all(search.results.slice(0, 20).map((item) => item.data()));
+    status.textContent = results.length ? `找到 ${search.results.length} 篇` : "没有找到相关文章";
+    // excerpt is HTML produced by Pagefind with <mark> around matches.
+    list.innerHTML = results
+      .map(
+        (item) =>
+          `<li><h2><a href="${escapeText(item.url)}">${escapeText(item.meta.title ?? item.url)}</a></h2><p>${item.excerpt}</p></li>`,
+      )
+      .join("");
+  }
+
+  const initial = new URL(location.href).searchParams.get("q") ?? "";
+  input.value = initial;
+  if (initial) run(initial);
+  input.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => run(input.value), 200);
+  });
+</script>

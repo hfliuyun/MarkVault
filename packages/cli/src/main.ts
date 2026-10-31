@@ -3,11 +3,15 @@ import { stat } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { applyMigration, loadVault, planMigration, type Diagnostic } from "@markvault/content";
 import { readConfig, resolveVaultPath } from "./config.ts";
+import { buildSite, runInSite } from "./site.ts";
 
 const USAGE = `用法：markvault <命令> [选项]
 
 命令：
   check               校验全部内容，不上传、不部署
+  preview             本地预览（astro dev），vault 改动后页面自动刷新
+  build               校验后构建站点到 site/dist（含搜索索引）
+  deploy              构建并部署到 Cloudflare（wrangler deploy）
   migrate             把旧格式内容转换为新格式（默认只预览，加 --apply 才会修改）
 
 选项：
@@ -44,6 +48,13 @@ async function main(argv: string[]): Promise<number> {
       return runCheck(vault, config.ignore);
     case "migrate":
       return runMigrate(vault, values.apply);
+    case "preview":
+      await runInSite("astro", ["dev"], { vault });
+      return 0;
+    case "build":
+      return runBuild(vault, config.ignore, false);
+    case "deploy":
+      return runBuild(vault, config.ignore, true);
     default:
       process.stderr.write(`未知命令：${command}\n\n${USAGE}`);
       return 1;
@@ -64,6 +75,19 @@ async function runCheck(vault: string, ignore: string[] | undefined): Promise<nu
   lines.push(errors > 0 ? `✗ ${errors} 个错误，${warnings} 个警告` : `✓ 没有错误，${warnings} 个警告`);
   process.stdout.write(`\n${lines.join("\n")}\n`);
   return errors > 0 ? 1 : 0;
+}
+
+async function runBuild(vault: string, ignore: string[] | undefined, deploy: boolean): Promise<number> {
+  const { diagnostics } = await loadVault(vault, { ignore });
+  const errors = diagnostics.filter((item) => item.level === "error");
+  if (errors.length > 0) {
+    printDiagnostics(errors);
+    process.stderr.write(`\n✗ 有 ${errors.length} 个错误，已停止。先运行 markvault check 查看详情。\n`);
+    return 1;
+  }
+  await buildSite({ vault });
+  if (deploy) await runInSite("wrangler", ["deploy"], { vault });
+  return 0;
 }
 
 async function runMigrate(vault: string, apply: boolean): Promise<number> {

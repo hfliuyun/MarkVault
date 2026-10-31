@@ -1,4 +1,6 @@
 import type { Root } from "mdast";
+import remarkCjkFriendly from "remark-cjk-friendly";
+import remarkCjkFriendlyGfmStrikethrough from "remark-cjk-friendly-gfm-strikethrough";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkParse from "remark-parse";
@@ -34,7 +36,7 @@ const OBSIDIAN_COMMENT = /%%[\s\S]*?%%/g;
 /** `![alt](path with spaces.png)` – not an image in CommonMark. */
 const SPACED_IMAGE = /!\[[^\]\n]*\]\(([^)<>\n]*\s[^)<>\n]*)\)/g;
 
-const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const parser = unified().use(remarkParse).use(remarkGfm).use(remarkCjkFriendly).use(remarkCjkFriendlyGfmStrikethrough).use(remarkMath);
 
 /** Replace Obsidian %% comments with blank text, keeping line numbers stable. */
 export function stripObsidianComments(body: string): string {

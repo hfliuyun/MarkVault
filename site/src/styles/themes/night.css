@@ -1,0 +1,28 @@
+/* 夜：默认深色主题。暖黑底、浅橙强调色、衬线标题。 */
+[data-theme="night"] {
+  color-scheme: dark;
+  --bg: #1f1e1c;
+  --surface: #282724;
+  --surface-2: #32302c;
+  --text: #ecebe5;
+  --text-2: #c4c2b9;
+  --muted: #9a988f;
+  --border: #36342f;
+  --border-strong: #4a4740;
+  --accent: #e08a65;
+  --accent-soft: #3a2a22;
+  --code-bg: #262522;
+  --mark: #5a4a1c;
+  --heading-font: var(--font-serif);
+  --c-note: #7aa7e8;
+  --c-tip: #7cc597;
+  --c-warn: #e0b45a;
+  --c-danger: #ec8a8a;
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* 代码高亮使用 Shiki 的深色那一组变量 */
+[data-theme="night"] .shiki,
+[data-theme="night"] .shiki span {
+  color: var(--shiki-dark);
+}

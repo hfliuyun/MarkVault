@@ -1,0 +1,28 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { formatDate, getVault, latestDate, seriesUrl } from "../../lib/vault";
+
+const model = await getVault();
+const series = [...model.series]
+  .filter((item) => item.posts.length > 0)
+  .sort((a, b) => (latestDate(a) < latestDate(b) ? 1 : -1));
+---
+
+<BaseLayout title="系列" nav="series">
+  <div class="wrap">
+    <section class="page-head measure">
+      <h1>系列</h1>
+      <p>按主题连续写的文章。</p>
+    </section>
+    <div class="measure">
+      <ul class="series-list">
+        {series.map((item) => (
+          <li>
+            <h2><a href={seriesUrl(item.slug)}>{item.title}</a></h2>
+            <div class="info">{item.posts.length} 篇 · 最近更新 {formatDate(latestDate(item))}</div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</BaseLayout>

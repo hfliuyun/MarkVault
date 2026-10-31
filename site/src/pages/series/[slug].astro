@@ -1,0 +1,30 @@
+---
+import "katex/dist/katex.min.css";
+import type { Series } from "@markvault/content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostList from "../../components/PostList.astro";
+import { getVault, render } from "../../lib/vault";
+
+export async function getStaticPaths() {
+  const model = await getVault();
+  return model.series.map((item) => ({ params: { slug: item.slug }, props: { path: item.path } }));
+}
+
+const model = await getVault();
+const series = model.series.find((item) => item.path === Astro.props.path) as Series;
+const rendered = await render(series);
+---
+
+<BaseLayout title={series.title} description={rendered.excerpt} nav="series">
+  <div class="wrap">
+    <section class="page-head measure">
+      <h1>{series.title}</h1>
+      <p>共 {series.posts.length} 篇</p>
+    </section>
+    <div class="measure">
+      {rendered.html.trim() && <div class="prose series-intro" set:html={rendered.html} />}
+      <PostList posts={series.posts} byYear={false} />
+      <div class="pager"></div>
+    </div>
+  </div>
+</BaseLayout>

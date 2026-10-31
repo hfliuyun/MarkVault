@@ -19,13 +19,13 @@
 
 ## 当前状态
 
-**阶段 0、阶段 1 已完成，下一步是阶段 2。** vault 已迁移成新格式并推送到 GitHub；`markvault check` 结果是 10 篇文章、4 个系列，0 个错误。D1 已创建。只剩 Cloudinary 凭据要用户自己填写（阶段 3 才用到）。
+**阶段 0、1、2 已完成，下一步是阶段 3（图片）。** 新站点的预览版已经部署到 https://markvault.wangsheng.workers.dev ，除图片外都能用：文章、系列、分类、标签、搜索、三套主题、旧链接跳转。图片要等阶段 3 的 `/img/*` Worker 和 Cloudinary 上传完成后才会显示。
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
-| 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 完成（Cloudinary 凭据待填） | 代码 `dbf0deb`；vault `ee21fc2` |
+| 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 完成 | 代码 `dbf0deb`；vault `ee21fc2` |
 | 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
-| 2 | Astro 站点、主题、hash 跳转、`_redirects` | 未开始 | |
+| 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成，已部署预览 | 见 git log |
 | 3 | 图片：无损压缩、Cloudinary、`/img/*` | 未开始 | |
 | 4 | Paste：Worker、D1、设备信任、旧数据导入 | 未开始 | |
 | 5 | 切换域名到 Worker | 未开始 | |
@@ -40,16 +40,13 @@
 | vault：`.gitignore`、停止跟踪图片、提交迁移前快照，推送到 `origin` | 完成（`ee21fc2`） |
 | D1：`markvault`，区域 APAC，`database_id` = `003333e1-03a1-4990-a3ef-08e6d6c87ee8` | 完成（还没有建表） |
 | 备份 DMIT 的内容目录和 `server_flask/data/`，与 vault 做 diff | 完成（见"环境事实"） |
-| Cloudinary：账号已注册；凭据由用户填进 `~/.config/markvault/config.json` | 待用户填写；Strict Transformations 在阶段 3 开启 |
+| Cloudinary：账号已注册，凭据已由用户填进 `~/.config/markvault/config.json` | 完成；Strict Transformations 在阶段 3 开启 |
 
 ## 待用户处理
 
-1. **作废两个已经泄露的密钥。** 它们都没进过 git，但明文放在不该放的地方：
-   - Cloudflare API token（前缀 `cfut_Ygj2`）：在已删除的 `server_flask/test_purge.py` 里，DMIT 上 `/home/aa/.config/systemd/user/markvault-backend.service` 里也有。
-   - Notion token（前缀 `ntn_5703`）：同样在这个 service 文件里。Notion 同步已经不用了，直接作废。
-2. **Cloudinary 凭据**：把 `cloud_name`、`api_key`、`api_secret` 填进 `~/.config/markvault/config.json`（已建好，权限 600）。阶段 3 才会用到。不要贴在对话里。
-3. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
-4. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
+1. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
+2. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
+3. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
 
 ## 环境事实
 
@@ -90,19 +87,27 @@
 
 ## 下一步
 
-阶段 2：搭建 Astro 站点。
+阶段 3：图片。
 
-1. 渲染管线 `packages/content/src/render/`，按设计文档 3.4 节：
-   - remark-obsidian：wikilink、图片嵌入、callout、高亮、注释、块引用标记
-   - rehype-sanitize
-   - KaTeX
-   - Shiki 双主题
-   - 目录（h2 到 h4，标题 id 沿用旧的 slugify 规则）
-2. `site/`：Astro 项目，使用自定义 Content Layer loader 调用 `loadVault()`。按 `docs/specs/2026-11-01-theme-prototype.html` 实现页面和三套主题，再加上 hash 跳转脚本和 `_redirects`（包括 `redirect_from`，比如 `sub2api-delopy`）。
-3. `markvault publish` 和 `markvault deploy`，以及 `.markvault/published.json` 的检查。图片在阶段 3 之前先用占位地址。
-4. 部署到 `*.workers.dev` 预览，测试 Pagefind 的中文搜索。
+1. `packages/cli` 实现无损压缩（设计文档 4.2）。本机没有 oxipng、gifsicle、svgo，用 npm 包：oxipng 用 wasm 版（如 `@jsquash/oxipng`），JPEG 用 `jpegtran-bin` 或本机 `/opt/homebrew/bin/jpegtran`，GIF 用 `gifsicle` 包，SVG 用 `svgo`。逐像素比较用 `sharp` 解码。
+2. Cloudinary 签名上传：`public_id` = `markvault/<hash>`，加 eager 转换 `f_webp,q_auto,c_limit,w_1600`。然后在 Cloudinary 后台开启 Strict Transformations（需要用户操作，或者通过 Admin API 设置）。
+3. `markvault publish [笔记]`：
+   - 补 `publish`、`slug`、`date`
+   - 运行 check
+   - 上传图片，写 `images.json`
+   - vault 执行 git commit 和 push
+   - 用 `MARKVAULT_REQUIRE_UPLOADED=1` 构建
+   - 部署
+   - 写 `.markvault/published.json`，并实现设计文档 3.5 节里"slug 消失"的警告
+4. `site/worker/`：实现 `/img/*`（设计文档 4.5），给 `wrangler.jsonc` 加上 `main`、`run_worker_first: ["/img/*"]` 和 `CLOUDINARY_CLOUD` 变量。
+5. 重写 Obsidian 插件（设计文档 5.5），可以放在阶段 3 末尾，或者单独做。
 
 ## 本地测试
+
+- 构建：`npm run markvault -- build`，输出到 `site/dist`，包含 Pagefind 索引和 `_redirects`。
+- 本地预览（开发模式）：`npm run markvault -- preview`，访问 http://localhost:4321 。vault 有改动时页面会自动刷新，`/img/*` 直接读 vault 里的原图。开发模式下没有搜索索引。
+- 测试构建产物：`zsh scripts/dev/serve-run.sh <命令>` 会在 8787 端口用 wrangler dev 托管 `site/dist`，命令执行完后关闭。配合 `node scripts/dev/cdp.mjs <url> <等待毫秒> <JS 表达式>`（headless Chrome，通过 DevTools 协议驱动）可以检查页面状态。环境变量 `WIDTH`、`HEIGHT`、`SCHEME=light|dark`、`SHOT=文件.png` 用于截图。注意：本机设置了 HTTP 代理，访问 localhost 时要加 `curl --noproxy "*"`。
+- 部署预览：`npm run markvault -- deploy`，部署到 https://markvault.wangsheng.workers.dev 。
 
 - 类型检查：`node_modules/.bin/tsc --noEmit -p tsconfig.json`（或 `npm run typecheck`）。
 - CLI 直接用 Node 运行 TypeScript（Node ≥ 22.18 原生支持类型擦除）：`npm run markvault -- check`，默认读取 `./content`。
@@ -157,3 +162,29 @@
 - D1：先建在了 WNAM 区域，随即删除，改建到 APAC，因为离用户更近。
 - 建立 `~/.config/markvault/config.json`，权限 600，Cloudinary 字段留空。
 - 删除了 `.tmp/ssh/`（私钥副本）和 `.tmp/vault-head/`。
+
+### 2026-11-01（Kiro CLI，阶段 2）
+
+- 渲染管线 `packages/content/src/render/`：
+  - `obsidian.ts`：wikilink、图片嵌入（`|300`、`|raw`）、callout（可折叠的用 details）、`==高亮==`、块引用标记、mermaid、本地 .md 链接改写
+  - `rehype.ts`：标题 id（沿用 Flask 的规则，重复的加 `-2`）；目录取 h2 到 h4，跳过脚注标题；单独一张图的段落改成 figure，Typora 默认的 alt 不当图注；表格包一层滚动容器；代码块外包 `div.code-block[data-lang]`；统计阅读时长
+  - `index.ts`：处理顺序是 sanitize 白名单 → KaTeX → Shiki 双主题。sanitize 关掉了 clobber，否则脚注 id 会被加两次前缀，引用对不上
+- 加了 `remark-cjk-friendly`。不加的话，`**“编码”**决定` 这种中文标点紧挨 `**` 的写法不会变成粗体，containers 那篇里正好有。
+- `site/`（Astro 7.4）：
+  - 页面：首页、分页、文章、系列、分类、标签、搜索、关于、Paste 占位页、404
+  - 样式：按原型拆成 `base`、`prose`、`components` 和三个主题文件
+  - 其他：hash 跳转和主题内联脚本，⌘K 跳到搜索页，代码复制按钮，目录跟随滚动高亮，mermaid 按需加载
+- CLI 新增 `preview`、`build`、`deploy`，位于 `packages/cli/src/site.ts`。
+- 验证：
+  - 45 个页面构建通过，tsc 通过。
+  - 用 wrangler dev 在本地托管：307 补尾斜杠、`/posts/sub2api-delopy` 308 跳转、404 页面都正常。
+  - 旧 hash 链接在浏览器里跳到新路径，`/#/manage` 跳回首页。
+  - Pagefind 中文搜索：采样率、容器格式、逻辑、NALU 都能搜到，摘要会高亮命中词。
+  - 390px 宽时没有横向溢出。
+  - 浅色和深色主题都截图看过。
+  - 已部署到 workers.dev，线上各条路由的返回结果和本地一致。
+- 还没做的：
+  - 图片显示（阶段 3）
+  - Paste 页面（阶段 4）
+  - `published.json` 检查（和 publish 一起做）
+  - `scripts/setup.sh`

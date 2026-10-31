@@ -1,0 +1,140 @@
+---
+import "katex/dist/katex.min.css";
+import type { Post } from "@markvault/content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { categoryUrl, formatDate, getVault, postUrl, render, seriesOf, seriesPosition, seriesUrl, tagUrl } from "../../lib/vault";
+
+export async function getStaticPaths() {
+  const model = await getVault();
+  return model.posts.map((post) => ({ params: { slug: post.slug }, props: { path: post.path } }));
+}
+
+const model = await getVault();
+const post = model.posts.find((item) => item.path === Astro.props.path) as Post;
+const rendered = await render(post);
+const series = seriesOf(model, post);
+const position = series ? seriesPosition(series, post) : 0;
+const previous = series && position > 1 ? series.posts[position - 2] : undefined;
+const next = series && position < series.posts.length ? series.posts[position] : undefined;
+const toc = rendered.toc;
+---
+
+<BaseLayout title={post.title} description={post.summary || rendered.excerpt} nav={series ? "series" : "home"}>
+  <div class="wrap">
+    <div class="post-layout">
+      <article data-pagefind-body>
+        {series && (
+          <p class="eyebrow" data-pagefind-ignore>
+            <a href={seriesUrl(series.slug)}>{series.title}</a> · 第 {position} 篇
+          </p>
+        )}
+        <h1 class="post-title" data-pagefind-meta="title">{post.title}</h1>
+        <div class="meta" data-pagefind-ignore>
+          <time datetime={post.date}>{formatDate(post.date)}</time>
+          {post.updated && <span>更新于 {formatDate(post.updated)}</span>}
+          <span>约 {rendered.readingMinutes} 分钟</span>
+          {post.categories.map((name) => <a href={categoryUrl(name)}>{name}</a>)}
+          {post.tags.length > 0 && (
+            <span class="tags">{post.tags.map((name) => <a href={tagUrl(name)}>#{name}</a>)}</span>
+          )}
+        </div>
+
+        {toc.length > 1 && (
+          <details class="toc-inline" data-pagefind-ignore>
+            <summary>目录</summary>
+            {toc.map((entry) => <a class={`l${entry.level}`} href={`#${entry.id}`}>{entry.title}</a>)}
+          </details>
+        )}
+
+        <div class="prose" set:html={rendered.html} />
+
+        {series && (
+          <section class="series-box" data-pagefind-ignore>
+            <h3><a href={seriesUrl(series.slug)}>{series.title}</a></h3>
+            <p class="sub">共 {series.posts.length} 篇</p>
+            <ol>
+              {series.posts.map((item) =>
+                item.path === post.path ? (
+                  <li aria-current="page">{item.title}</li>
+                ) : (
+                  <li><a href={postUrl(item.slug)}>{item.title}</a></li>
+                ),
+              )}
+            </ol>
+          </section>
+        )}
+        {(previous || next) && (
+          <nav class="prev-next" aria-label="系列导航" data-pagefind-ignore>
+            {previous && <a href={postUrl(previous.slug)}><small>← 上一篇</small>{previous.title}</a>}
+            {next && <a class="next" href={postUrl(next.slug)}><small>下一篇 →</small>{next.title}</a>}
+          </nav>
+        )}
+      </article>
+
+      {toc.length > 1 ? (
+        <aside class="toc" aria-label="目录">
+          <div class="toc-title">目录</div>
+          {toc.map((entry) => <a class={`l${entry.level}`} href={`#${entry.id}`}>{entry.title}</a>)}
+        </aside>
+      ) : (
+        <aside class="toc" aria-hidden="true"></aside>
+      )}
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  // 代码块复制按钮
+  document.querySelectorAll<HTMLElement>(".prose .code-block").forEach((block) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "code-copy";
+    button.textContent = "复制";
+    button.addEventListener("click", async () => {
+      const code = block.querySelector("pre")?.innerText ?? "";
+      try {
+        await navigator.clipboard.writeText(code);
+        button.textContent = "已复制";
+      } catch {
+        button.textContent = "复制失败";
+      }
+      setTimeout(() => (button.textContent = "复制"), 1600);
+    });
+    block.appendChild(button);
+  });
+
+  // 目录高亮当前章节
+  const links = [...document.querySelectorAll<HTMLAnchorElement>("aside.toc a")];
+  const targets = links
+    .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
+    .filter((item): item is HTMLElement => Boolean(item));
+  if (targets.length > 0) {
+    const update = () => {
+      let current = targets[0];
+      for (const target of targets) {
+        if (target.getBoundingClientRect().top <= 96) current = target;
+      }
+      links.forEach((link) => link.classList.toggle("active", decodeURIComponent(link.hash.slice(1)) === current.id));
+    };
+    document.addEventListener("scroll", update, { passive: true });
+    update();
+  }
+
+  // mermaid：只有页面里有图时才加载，主题切换时重新渲染
+  const diagrams = [...document.querySelectorAll<HTMLElement>("pre.mermaid")];
+  if (diagrams.length > 0) {
+    diagrams.forEach((item) => (item.dataset.source = item.textContent ?? ""));
+    const draw = async () => {
+      const { default: mermaid } = await import("mermaid");
+      const dark = document.documentElement.dataset.theme === "night";
+      mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "neutral", securityLevel: "strict" });
+      diagrams.forEach((item) => {
+        item.removeAttribute("data-processed");
+        item.textContent = item.dataset.source ?? "";
+      });
+      await mermaid.run({ nodes: diagrams });
+    };
+    draw();
+    window.addEventListener("mv-theme-change", draw);
+  }
+</script>

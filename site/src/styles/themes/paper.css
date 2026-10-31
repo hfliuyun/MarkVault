@@ -1,0 +1,22 @@
+/* 纸：默认浅色主题。暖白底、赤陶强调色、衬线标题。 */
+[data-theme="paper"] {
+  color-scheme: light;
+  --bg: #faf9f5;
+  --surface: #f2f0e8;
+  --surface-2: #ebe8dd;
+  --text: #1f1e1d;
+  --text-2: #4d4c48;
+  --muted: #6f6e67;
+  --border: #e3e0d6;
+  --border-strong: #cfcbbf;
+  --accent: #b0532f;
+  --accent-soft: #f3e3da;
+  --code-bg: #f2f0e8;
+  --mark: #f6e7b3;
+  --heading-font: var(--font-serif);
+  --c-note: #3b6fb6;
+  --c-tip: #3d8457;
+  --c-warn: #b07b16;
+  --c-danger: #b23b3b;
+  --shadow-pop: 0 8px 24px rgba(31, 30, 29, 0.08);
+}

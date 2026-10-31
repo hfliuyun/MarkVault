@@ -1,0 +1,51 @@
+---
+import type { Post } from "@markvault/content";
+import { formatDate, getVault, groupByYear, monthDay, postUrl, render, seriesOf, seriesPosition, seriesUrl } from "../lib/vault";
+
+interface Props {
+  posts: Post[];
+  /** Group under year headings (home page). */
+  byYear?: boolean;
+}
+
+const { posts, byYear = true } = Astro.props;
+const model = await getVault();
+const groups = byYear ? groupByYear(posts) : [["", posts] as [string, Post[]]];
+
+async function summaryOf(post: Post): Promise<string> {
+  if (post.summary) return post.summary;
+  return (await render(post)).excerpt;
+}
+
+const items = new Map<string, { summary: string; series?: { title: string; url: string; position: number } }>();
+for (const post of posts) {
+  const series = seriesOf(model, post);
+  items.set(post.path, {
+    summary: await summaryOf(post),
+    series: series ? { title: series.title, url: seriesUrl(series.slug), position: seriesPosition(series, post) } : undefined,
+  });
+}
+---
+
+{groups.map(([year, list]) => (
+  <>
+    {year && <div class="year">{year}</div>}
+    <ul class={byYear ? "post-list" : "post-list full-date"}>
+      {list.map((post) => {
+        const item = items.get(post.path)!;
+        return (
+          <li class="post-item">
+            <time datetime={post.date}>{byYear ? monthDay(post.date) : formatDate(post.date)}</time>
+            <div>
+              <h2><a href={postUrl(post.slug)}>{post.title}</a></h2>
+              {item.summary && <p>{item.summary}</p>}
+              {item.series && (
+                <a class="chip" href={item.series.url}>{item.series.title} · {item.series.position}</a>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  </>
+))}

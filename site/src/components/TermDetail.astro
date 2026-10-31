@@ -1,0 +1,28 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostList from "./PostList.astro";
+import { getVault, taxonomy } from "../lib/vault";
+
+interface Props {
+  field: "categories" | "tags";
+  name: string;
+}
+const { field, name } = Astro.props;
+const model = await getVault();
+const posts = taxonomy(model.posts, field).find(([term]) => term === name)?.[1] ?? [];
+const label = field === "categories" ? "分类" : "标签";
+const heading = field === "tags" ? `#${name}` : name;
+---
+
+<BaseLayout title={`${label}：${name}`} nav={field}>
+  <div class="wrap">
+    <section class="page-head measure">
+      <h1>{heading}</h1>
+      <p>{label} · {posts.length} 篇 · <a href={field === "categories" ? "/categories/" : "/tags/"}>全部{label}</a></p>
+    </section>
+    <div class="measure">
+      <PostList posts={posts} byYear={false} />
+      <div class="pager"></div>
+    </div>
+  </div>
+</BaseLayout>

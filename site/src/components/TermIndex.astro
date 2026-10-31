@@ -1,0 +1,29 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { categoryUrl, getVault, tagUrl, taxonomy } from "../lib/vault";
+
+interface Props {
+  field: "categories" | "tags";
+}
+const { field } = Astro.props;
+const model = await getVault();
+const terms = taxonomy(model.posts, field);
+const label = field === "categories" ? "分类" : "标签";
+const urlOf = field === "categories" ? categoryUrl : tagUrl;
+---
+
+<BaseLayout title={label} nav={field}>
+  <div class="wrap">
+    <section class="page-head measure">
+      <h1>{label}</h1>
+      <p>共 {terms.length} 个{label}</p>
+    </section>
+    <div class="measure">
+      <ul class="term-cloud">
+        {terms.map(([name, posts]) => (
+          <li><a href={urlOf(name)}>{field === "tags" ? `#${name}` : name}<small>{posts.length}</small></a></li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</BaseLayout>

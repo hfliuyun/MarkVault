@@ -8,3 +8,14 @@ export { FileResolver, isImagePath, isExternalUrl } from "./resolve.ts";
 export { extractRefs, parseMarkdown, stripObsidianComments } from "./links.ts";
 export { MANIFEST_PATH, readManifest, writeManifest, hashFile, emptyManifest } from "./images.ts";
 export { planMigration, applyMigration, titleToFileStem, fixSpacedImages, type MigrationPlan } from "./migrate.ts";
+export {
+  renderNote,
+  linkContextFor,
+  imagePublicPath,
+  postUrl,
+  seriesUrl,
+  slugifyHeading,
+  type RenderedNote,
+  type RenderOptions,
+  type TocEntry,
+} from "./render/index.ts";

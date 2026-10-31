@@ -190,10 +190,12 @@ title: 音视频数据流基础              # 可选。不写就用文件名
 渲染管线的顺序：
 
 ```
-remark-parse → remark-gfm → remark-math → remark-obsidian（自定义）
+remark-parse → remark-gfm → remark-cjk-friendly → remark-math → remark-obsidian（自定义）
 → remark-rehype → rehype-raw → rehype-sanitize（白名单）
 → rehype-katex → Shiki → 标题 id 和目录
 ```
+
+remark-cjk-friendly 解决 CommonMark 的一个中文问题：`**“编码”**决定` 这种中文标点紧挨 `**` 的写法，在 CommonMark 里不会变成粗体。
 
 先过滤正文里的原始 HTML，再交给 KaTeX 和 Shiki。它们生成的 HTML 是可信的，不需要再过滤。
 
@@ -498,10 +500,12 @@ MarkVault/
 │   │   └── images.ts         图片引用解析、hash、images.json 读写
 │   └── cli/                  markvault 命令、Cloudinary 上传、wrangler 调用
 ├── site/                     Astro 站点 + Worker
-│   ├── astro.config.mjs
+│   ├── astro.config.ts
+│   ├── integrations/markvault.ts  开发时监听 vault 和本地 /img；构建后写 _redirects
 │   ├── wrangler.jsonc
 │   ├── src/
-│   │   ├── content.config.ts 自定义 Content Layer loader，调用 packages/content
+│   │   ├── lib/vault.ts       读取 vault（loadVault）并缓存渲染结果，所有页面共用
+│   │   ├── site.config.ts     站点名、首页标语、导航
 │   │   ├── layouts/          BaseLayout（含 hash 跳转脚本）、PostLayout
 │   │   ├── pages/
 │   │   │   ├── index.astro、page/[n].astro       首页和分页
@@ -706,6 +710,11 @@ site/src/styles/
 - `.markvault/published.json` 的"slug 消失"警告要依赖 publish 写入的记录，放到阶段 2 实现 `publish` 时一起做。
 
 ### 阶段 2：Astro 站点
+
+实现补充：
+- 没有用 Astro Content Layer，页面在 `getStaticPaths` 里直接调用 `site/src/lib/vault.ts`。数据模型已经由 `packages/content` 建好，再套一层 loader 没有好处。
+- `site/integrations/markvault.ts` 负责三件事：开发时监听 vault 目录，有改动就刷新页面；开发时用 vault 里的原图响应 `/img/<hash>.*`；构建完成后写 `dist/_redirects`。
+- 阶段 2 的 `wrangler.jsonc` 只有静态资源，没有 `main`。阶段 3、4 再加 Worker 脚本和 D1 绑定。
 
 - 搭建 `site/`，按第 8 节和原型实现页面、三套主题，以及 hash 跳转脚本和 `_redirects`。
 - 部署到 `markvault.<子域>.workers.dev` 预览，逐页和旧站对比。
