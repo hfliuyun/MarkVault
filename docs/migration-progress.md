@@ -19,12 +19,12 @@
 
 ## 当前状态
 
-**阶段 0 进行中，阶段 1 的代码已完成。** 代码仓库已清理。`markvault check` 和 `markvault migrate` 已实现，并在 vault 副本上验证过。真正对 vault 执行迁移，要等 vault 写权限，以及用户修正几处内容问题（见"待用户处理"第 2、7 项）。
+**阶段 0、阶段 1 已完成，下一步是阶段 2。** vault 已迁移成新格式并推送到 GitHub；`markvault check` 结果是 10 篇文章、4 个系列，0 个错误。D1 已创建。只剩 Cloudinary 凭据要用户自己填写（阶段 3 才用到）。
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
-| 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 进行中 | `dbf0deb` |
-| 1 | 内容层 `packages/content`、`markvault check`、`markvault migrate` | 代码完成，待对 vault 执行 | 见 git log |
+| 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 完成（Cloudinary 凭据待填） | 代码 `dbf0deb`；vault `ee21fc2` |
+| 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
 | 2 | Astro 站点、主题、hash 跳转、`_redirects` | 未开始 | |
 | 3 | 图片：无损压缩、Cloudinary、`/img/*` | 未开始 | |
 | 4 | Paste：Worker、D1、设备信任、旧数据导入 | 未开始 | |
@@ -36,37 +36,43 @@
 | 事项 | 状态 |
 |---|---|
 | 代码仓库：删除临时脚本和工具缓存，补充 `.gitignore` | 完成（`dbf0deb`） |
-| 代码仓库：提交设计文档、主题原型、本文件 | 完成（见 git log） |
-| 内容仓库：补 `.gitignore`、停止跟踪图片、提交迁移前快照 | 等待写权限（见"待用户处理"） |
-| 注册 Cloudinary，开启 Strict Transformations | 待用户 |
-| `wrangler login`，`wrangler d1 create markvault` | 待用户登录后由 agent 执行 |
-| 备份 DMIT 上的 `server_flask/data/` 和内容目录，与本地 vault 做 diff | 待用户（需要 SSH） |
+| 代码仓库：提交设计文档、主题原型、本文件 | 完成（`763db12`） |
+| vault：`.gitignore`、停止跟踪图片、提交迁移前快照，推送到 `origin` | 完成（`ee21fc2`） |
+| D1：`markvault`，区域 APAC，`database_id` = `003333e1-03a1-4990-a3ef-08e6d6c87ee8` | 完成（还没有建表） |
+| 备份 DMIT 的内容目录和 `server_flask/data/`，与 vault 做 diff | 完成（见"环境事实"） |
+| Cloudinary：账号已注册；凭据由用户填进 `~/.config/markvault/config.json` | 待用户填写；Strict Transformations 在阶段 3 开启 |
 
 ## 待用户处理
 
-1. **作废一个 Cloudflare API token。** 已删除的 `server_flask/test_purge.py` 里明文写着一个 token（前缀 `cfut_Ygj2`）。它从未进入 git，但应该在 Cloudflare 后台作废。
-2. **给 agent 开放 vault 目录的写权限**：`/Users/yun/code/blog-content`（代码仓库里的 `content/` 是指向它的软链接）。阶段 0 的内容仓库清理和阶段 1 的 `markvault migrate` 都需要写这个目录。
-3. **为内容仓库创建 GitHub 私有仓库并添加 remote。** 现在 `blog-content` 没有任何 remote，只存在于本机和 Syncthing 里。
-4. 注册 Cloudinary（不需要绑卡），把 `cloud_name`、`api_key`、`api_secret` 准备好，在阶段 3 前由 `scripts/setup.sh` 写入本机配置。
-5. 在本机执行 `npx wrangler login`。
-6. SSH 到 DMIT，打包 `~/MarkVault/server_flask/data/` 和 `~/MarkVault/content/` 拷回本机，用于 diff 和导入旧 paste。
-7. 内容问题。这些是迁移前必须修正或决定的，`markvault migrate` 和 `markvault check` 会报出来：
-   - `posts/sub2api-deploy-blog/index.md`：文件开头有两行空行，所以 frontmatter 不会被识别（Obsidian 也不认）；另外 `title:Sub2API…` 冒号后少一个空格。删掉开头空行，补上空格。**不修这一项，migrate 会拒绝执行。**
-   - `posts/logistic-regression-2/` 的 slug `logistic-regression_2` 含下划线，不合法，内容又和 `logistic-regression` 重复。删掉，还是改 slug 保留？
-   - `series/av_stream_basics/h264-stream/index.md` 第 74 行的图片 `![HexFiend 查看起始码截图_占位](此处请替换为你本机的实际截图)` 是占位符。换成真实截图，或者删掉这一行。
-   - `series/av_stream_basics/README.md` 第 19 行链接到 `./音视频编解码流程.drawio`，但实际文件名是 `音视频编解码流程-2.drawio`。
-   - 系列标题二选一：`av-stream-basics` 的 README 写的是"音视频学习基础"，线上显示"音视频数据流基础"；`blog-system` 的两篇文章分别写了"博客维护"和"博客系统重构"。迁移默认取线上显示的标题，迁移后改系列笔记的 `title` 即可。
-8. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
+1. **作废两个已经泄露的密钥。** 它们都没进过 git，但明文放在不该放的地方：
+   - Cloudflare API token（前缀 `cfut_Ygj2`）：在已删除的 `server_flask/test_purge.py` 里，DMIT 上 `/home/aa/.config/systemd/user/markvault-backend.service` 里也有。
+   - Notion token（前缀 `ntn_5703`）：同样在这个 service 文件里。Notion 同步已经不用了，直接作废。
+2. **Cloudinary 凭据**：把 `cloud_name`、`api_key`、`api_secret` 填进 `~/.config/markvault/config.json`（已建好，权限 600）。阶段 3 才会用到。不要贴在对话里。
+3. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
+4. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
 
 ## 环境事实
 
 - 代码仓库：`/Users/yun/code/MarkVault`，远端 `origin/main`。
-- vault 和内容仓库：`/Users/yun/code/blog-content`。它同时是 Obsidian vault、独立 git 仓库（没有 remote）和 Syncthing 文件夹。根目录下还有一个空的 `.tmp.driveupload/`，说明可能有 Google Drive 也在同步这个目录，需要用户确认。
-- vault 里已跟踪的图片有 3 张，未跟踪的有 8 张，另有一个 `.drawio` 源文件。
-- 本机：Node v26.10.0、npm 11.19.1、`/opt/homebrew/bin/jpegtran`。没有 oxipng、gifsicle、svgo，阶段 3 改用 npm 包（wasm 或带二进制的包），不依赖 Homebrew。
-- 当前线上：前端在 Cloudflare Pages（绑定 GitHub 自动构建），`blog_by_vue/functions/api/[[catchall]].js` 把 `/api/*` 转发到 DMIT 上的 Flask（`VITE_API_BASE_URL`）。
+- vault 和内容仓库：`/Users/yun/code/blog-content`，远端 `https://github.com/hfliuyun/blog-vault.git`（私有，`main`）。代码仓库里的 `content/` 是指向它的软链接。根目录下有一个空的 `.tmp.driveupload/`，可能是某个云盘客户端留下的。
+- 本机配置：`~/.config/markvault/config.json`，`vault` 已设为上面的路径。
+- 本机工具：Node v26.10.0、npm 11.19.1、`/opt/homebrew/bin/jpegtran`。没有 oxipng、gifsicle、svgo，阶段 3 改用 npm 包（wasm 或自带二进制），不依赖 Homebrew。`wrangler` 已登录（用 `npx wrangler`，版本 4.156）。账号下另有一个与本项目无关的 D1 数据库 `token_monitor_db`，不要动它。
+- DMIT 服务器：
+  - 地址 `179.255.146.211`，用户 root。私钥在 `~/Library/CloudStorage/OneDrive-个人/应用/ssh_key/DMIT-X1rp8JVmad-id_rsa/id_rsa.pem`，使用时复制到 `.tmp/ssh/` 并设为 600，用完删除。
+  - SSH 要走本机代理：`-o ProxyCommand="nc -X 5 -x 127.0.0.1:10808 %h %p"`。
+  - 线上服务以用户 `aa` 运行：代码在 `/home/aa/MarkVault`，内容在 `/home/aa/blog-content`（软链接 `content`），systemd 用户服务是 `markvault-backend`（gunicorn 监听 127.0.0.1:8000）。`/root/MarkVault` 是另一份旧副本，没有在用。
+- DMIT 的备份在 `.tmp/server-backup/dmit-20261101.tar.gz`，已解压在同一目录（`.tmp/` 被 gitignore）。里面有：
+  - 内容目录，和迁移前的 vault 快照 `ee21fc2` 完全一致，只多了一个插件上传的重复目录（见下一条）。
+  - `server_flask/data/pastes/` 下的 2 条 paste（`g27h8h3t`、`3cy3ladc`，都是永不过期），阶段 4 导入 D1。
+  - `totp_secret.key` 和 Notion 同步状态文件，迁移后都不再需要。
+- **2026-11-01 发现线上 API 一直返回 500**，有两个原因：
+  - sub2api 那篇的 frontmatter 是坏的。
+  - 插件把 h264 那篇按 `series.id` 又写了一份到 `series/av-stream-basics/h264-stream/`，造成 slug 重复。
+
+  已经在服务器上修好：修正了那篇的 title 行，删掉了这个重复目录（内容和原文完全相同，备份里有）。现在 `/api/posts` 返回 200，共 11 篇。服务器上其余内容仍是旧格式，旧站点会一直以这个状态运行到切换。
+- 当前线上前端在 Cloudflare Pages（绑定 GitHub 自动构建），`blog_by_vue/functions/api/[[catchall]].js` 把 `/api/*` 转发到 `https://apiblog.liuyun.ac.cn`，也就是 DMIT 上的 Flask。
 - 前端使用 hash 路由（`createWebHashHistory`），所以旧链接都是 `/#/...` 形式。
-- `content/legacy/abbrlink-map.json` 不存在，文章里也没有 `legacy.abbrlinks`。`/p/:abbrlink` 目前没有需要映射的旧链接。
+- 没有 `legacy/abbrlink-map.json`，文章里也没有 `legacy.abbrlinks`，所以 `/p/:abbrlink` 目前没有需要映射的旧链接。
 
 ## 决策记录
 
@@ -84,10 +90,17 @@
 
 ## 下一步
 
-1. 用户处理"待用户处理"第 2 项（vault 写权限）和第 7 项（内容问题）之后：
-   - 完成内容仓库清理：写入 `.gitignore`（内容是图片扩展名、`.obsidian/`、`.trash/`、`.stfolder/`、`.stignore`、`*.sync-conflict-*`、`.tmp.driveupload/`、`.DS_Store`），`git rm --cached` 已跟踪的图片，提交迁移前快照。
-   - 执行 `npm run markvault -- migrate` 预览，再加 `--apply`，然后 `npm run markvault -- check` 直到没有错误，最后在 vault 仓库提交。
-2. 阶段 2：搭建 `site/`（Astro）。先做渲染管线 `packages/content/src/render/`（remark-obsidian、rehype-sanitize、KaTeX、Shiki、目录），再做页面和主题。可以和第 1 步并行，开发时用 `.tmp/vault-copy`（见下面"本地测试"）。
+阶段 2：搭建 Astro 站点。
+
+1. 渲染管线 `packages/content/src/render/`，按设计文档 3.4 节：
+   - remark-obsidian：wikilink、图片嵌入、callout、高亮、注释、块引用标记
+   - rehype-sanitize
+   - KaTeX
+   - Shiki 双主题
+   - 目录（h2 到 h4，标题 id 沿用旧的 slugify 规则）
+2. `site/`：Astro 项目，使用自定义 Content Layer loader 调用 `loadVault()`。按 `docs/specs/2026-11-01-theme-prototype.html` 实现页面和三套主题，再加上 hash 跳转脚本和 `_redirects`（包括 `redirect_from`，比如 `sub2api-delopy`）。
+3. `markvault publish` 和 `markvault deploy`，以及 `.markvault/published.json` 的检查。图片在阶段 3 之前先用占位地址。
+4. 部署到 `*.workers.dev` 预览，测试 Pagefind 的中文搜索。
 
 ## 本地测试
 
@@ -128,3 +141,19 @@
   - 第 9 节阶段 1 补充了实现细节。
 - 验证：tsc 通过；真实 vault 只做了预览，副本上做了完整流程（见"本地测试"）。
 - 没做：对真实 vault 执行迁移（等待写权限和内容修正）。`published.json` 检查推迟到阶段 2。
+
+### 2026-11-01（Kiro CLI，完成阶段 0 和阶段 1）
+
+- vault：
+  - 加了 `.gitignore`，停止跟踪 3 张图片，提交迁移前快照 `ee21fc2`。
+  - 添加 `origin` 并推送到 GitHub。
+- 按用户的授权修正内容（`c42e47e`）：
+  - sub2api：删掉开头的空行，修正 `title:`。slug 的拼写错误 `sub2api-delopy` 改成 `sub2api-deploy`，同时加上 `redirect_from: [sub2api-delopy]`。
+  - 删除 `logistic-regression-2`。
+  - 删掉 h264 那篇的占位图片。
+  - README 里坏掉的 drawio 链接改成 Obsidian 注释。
+- 执行 `markvault migrate --apply`，共 14 项（`adfca5e`）。之后 `check` 没有错误也没有警告。slug 和线上一致，只少了有意删除的 `logistic-regression_2`。
+- SSH 到 DMIT 备份内容和数据，做了 diff（结果见"环境事实"）。线上 API 原本返回 500，已在服务器上修好。
+- D1：先建在了 WNAM 区域，随即删除，改建到 APAC，因为离用户更近。
+- 建立 `~/.config/markvault/config.json`，权限 600，Cloudinary 字段留空。
+- 删除了 `.tmp/ssh/`（私钥副本）和 `.tmp/vault-head/`。
