@@ -19,7 +19,7 @@
 
 ## 当前状态
 
-**阶段 0 到 4 已完成，下一步是阶段 5（切换域名）。** 预览站点 https://markvault.wangsheng.workers.dev 上文章、图片和 Paste 都能用，D1 已建表，2 条旧 paste 已导入。阶段 4 的代码还没有推送到 GitHub：推送会触发旧 Pages 项目自动构建 `blog_by_vue`，留到阶段 5 再推。设备配对和 Cloudinary Strict Transformations 都已完成。
+**阶段 0 到 5 已完成，正式站点 https://blog.liuyun.ac.cn 已经由 Worker `markvault` 提供。** 下一步是阶段 6（清理），按设计先观察两周，2026-11-15 前后开始。代码仓库已推送，旧 Pages 项目的 Git 自动构建已关闭。
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
@@ -27,8 +27,8 @@
 | 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
 | 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成，已部署预览 | 见 git log |
 | 3 | 无损压缩、Cloudinary 上传、`/img/*` Worker、`publish`/`unpublish`、`published.json`、Obsidian 插件 0.2、`scripts/setup.sh` | 完成 | 见 git log；vault `e884a74` |
-| 4 | Paste：Worker、D1、设备信任、旧数据导入 | 完成，已部署预览（设备配对待用户操作） | 见 git log（未推送） |
-| 5 | 切换域名到 Worker | 未开始 | |
+| 4 | Paste：Worker、D1、设备信任、旧数据导入 | 完成 | `ced4448` |
+| 5 | 切换域名到 Worker | 完成（2026-11-01 14:09） | 见 git log |
 | 6 | 清理旧代码、更新文档、下线 DMIT | 未开始 | |
 
 ### 阶段 0 明细
@@ -44,10 +44,10 @@
 
 ## 待用户处理
 
-0. ~~信任第一台设备，再配对手机~~：2026-11-01 完成，线上已信任 `Mac · Safari` 和 `Android · Chrome`。切换域名后 cookie 按域名保存，要在新域名上用 `paste-invite` 和「添加设备」再做一遍。
+0. **在正式域名上重新信任设备**：cookie 按域名保存，workers.dev 上的信任在 blog.liuyun.ac.cn 上不算。运行 `npm run markvault -- paste-invite`（现在打印的是正式域名的链接）信任电脑，再在 https://blog.liuyun.ac.cn/paste/ 点「添加设备」配对手机。workers.dev 上的两台设备（`Mac · Safari`、`Android · Chrome`）可以在设备列表里移除，或者等一年后 Cron 自动清理。
 1. ~~在 Cloudinary 后台开启 Strict Transformations~~：2026-11-01 完成并验证。
 2. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
-3. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
+3. **不要再打开 Syncthing 和 DMIT 之间的同步。** 切换后博客已经不依赖 DMIT，阶段 6 会直接关掉那台服务器上的服务。
 4. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
 
 ## 环境事实
@@ -69,7 +69,10 @@
   - 插件把 h264 那篇按 `series.id` 又写了一份到 `series/av-stream-basics/h264-stream/`，造成 slug 重复。
 
   已经在服务器上修好：修正了那篇的 title 行，删掉了这个重复目录（内容和原文完全相同，备份里有）。现在 `/api/posts` 返回 200，共 11 篇。服务器上其余内容仍是旧格式，旧站点会一直以这个状态运行到切换。
-- 当前线上前端在 Cloudflare Pages（绑定 GitHub 自动构建），`blog_by_vue/functions/api/[[catchall]].js` 把 `/api/*` 转发到 `https://apiblog.liuyun.ac.cn`，也就是 DMIT 上的 Flask。
+- 正式域名 `blog.liuyun.ac.cn`（zone `liuyun.ac.cn`，id `0d081b69c6e620553fbfa1fb05b68991`）从 2026-11-01 14:09 起绑定 Worker `markvault`，写在 `site/wrangler.jsonc` 的 `routes` 里。workers.dev 地址保留到阶段 6。
+- 旧前端是 Pages 项目 `markvaultfront`（`markvault.pages.dev`）：自定义域名已解绑，Git 自动构建已关闭（`deployments_enabled: false`），项目和历史部署还在，阶段 6 删除。旧版里 `blog_by_vue/functions/api/[[catchall]].js` 把 `/api/*` 转发到 `https://apiblog.liuyun.ac.cn`，也就是 DMIT 上的 Flask。`apiblog` 的 DNS 记录还在。
+- wrangler 的 OAuth 令牌没有 DNS 编辑权限（只有 `zone (read)`）。给 Worker 绑域名前，这个名字上不能有别的 DNS 记录，所以旧 CNAME 是用户在后台手动删的。Pages 项目的设置可以用这个令牌通过 API 修改。
+- 本机网络到 Cloudflare 自定义域名的连接很不稳定（经代理或直连都是这样，切换前的旧 Pages 站也一样慢），偶尔连接超时或传输卡住。Worker 日志显示请求本身都是几毫秒完成。测试脚本要加重试，不要把一次超时当成站点故障。
 - 前端使用 hash 路由（`createWebHashHistory`），所以旧链接都是 `/#/...` 形式。
 - 没有 `legacy/abbrlink-map.json`，文章里也没有 `legacy.abbrlinks`，所以 `/p/:abbrlink` 目前没有需要映射的旧链接。
 
@@ -89,16 +92,17 @@
 | 2026-11-01 | Paste 页面用原生 TS，不用 Vue | 三个页面交互简单，不值得加框架；用户内容一律 `textContent` |
 | 2026-11-01 | 二维码用 `uqr`，不用 `qrcode` | 无依赖，浏览器出 SVG，终端出半格字符 |
 | 2026-11-01 | 配对链接的 token 放在 `#t=`，不放 `?t=` | 片段不会发给服务器，不会进 Workers 日志 |
-| 2026-11-01 | 阶段 4 先不推送代码仓库 | 推送会触发旧 Pages 项目构建 `blog_by_vue`；阶段 5 切换时一起处理 |
+| 2026-11-01 | 阶段 4 先不推送代码仓库 | 推送会触发旧 Pages 项目构建 `blog_by_vue`；阶段 5 先关自动构建再推送 |
 
 ## 下一步
 
-阶段 5：切换域名（设计文档第 9 节）。
+阶段 6：清理（设计文档第 9 节）。切换后先观察两周，2026-11-15 前后开始。
 
-1. 推送代码仓库之前，先在 Pages 项目里停用 Git 自动构建，或者确认那次构建失败不会影响线上旧站。
-2. 在 Pages 项目里解绑自定义域名，绑定到 Worker `markvault`，中间会有几分钟不可访问。
-3. 按设计文档 7.2 的 URL 对应表逐条验证旧链接，检查文章、图片、搜索、Paste。Paste 用 `paste-invite` 生成新域名的链接，再跑一次 `scripts/dev/paste-smoke.mjs`。
-4. 把 `~/.config/markvault/config.json` 里的 `site_url` 改成正式域名（`paste-invite` 和 `publish` 打印的链接用它）。`/img/*` 的防盗链按请求自己的域名放行，不用改。
+1. 关闭 DMIT 上的 `markvault-backend` 服务。删除 `apiblog` 的 DNS 记录需要用户在后台操作，原因同上。
+2. 删除 Pages 项目 `markvaultfront`。
+3. 按设计文档 7.1 末尾的清单删除旧代码和旧文档（`server_flask/`、`blog_by_vue/`、`manage.py`、`.github/workflows/deploy-backend.yml` 等；`obsidian-plugin/` 已经重写，保留），更新 `AGENTS.md`、`docs/architecture.md`、`docs/content-guide.md`、`docs/development-guide.md`、`docs/api.md`。
+4. 在 `docs/changelog.md` 里记录这次迁移。
+5. 决定是否关闭 workers.dev 地址（`workers_dev: false`），以及删掉 workers.dev 上配对过的设备。
 
 ## 本地测试
 
@@ -259,3 +263,16 @@
 - 检查 Strict Transformations：9 张图的 `f_webp,q_auto,c_limit,w_1600`、原图和 `/img/*.webp` 都返回 200。但伪造的转换参数（随机宽度、`e_grayscale`、`e_blur`）在 Cloudinary 上也返回 200，说明设置还没生效。
 - 用户保存设置后复测：新的伪造参数（`w_850`、`e_grayscale,w_352`）返回 401 `Transformation … is not allowed`。我们自己的 9 张图（WebP 转换、原图、`/img/*.webp`）仍然全部 200。
 - 上一轮测试在设置生效前生成了 6 个派生图（`9208fed3b117013d` 上的 `w_500`、`f_png,w_2000`、`e_blur:300`、`c_scale,w_3000`、`w_709`、`e_grayscale,w_403`）。已生成的派生图不受 Strict 限制，还能访问，但只占很少的存储，没有删除。
+
+### 2026-11-01（Claude Code，阶段 5）
+
+- 用 Cloudflare API 关闭 Pages 项目 `markvaultfront` 的 Git 自动构建，然后推送代码仓库（`e2635fd..63cdb39`），Pages 没有新构建。
+- 13:56:56 从 Pages 解绑 `blog.liuyun.ac.cn`，绑定 Worker 时失败：`blog` 上还有 CNAME，令牌没有 DNS 权限删掉它。13:57:44 把域名加回 Pages，旧站 13:58 恢复，中断约 1 分钟。
+- 用户在后台删掉 CNAME，后台脚本 14:09:33 绑定到 Worker，随后从 Pages 解绑。
+- `site/wrangler.jsonc` 加上 `routes`（custom domain），重新部署（版本 `009c1499`）。`site_url` 改成正式域名，`setup.sh` 和 CLI 提示里的默认值也一起改了。
+- 在正式域名上验证：
+  - 首页、全部文章、系列 / 分类 / 标签（含中文路径）、搜索、关于、Pagefind 都是 200。补尾斜杠和 `sub2api-delopy` 跳转正常，不存在的页面 404，旧的 `/api/posts` 返回 404 JSON。
+  - 9 张图 `/img/*.webp` 都是 200 并命中边缘缓存（`cf-cache-status: HIT`，`caches.default` 只在自定义域名上生效）。外站 Referer 403，原图 200。
+  - 浏览器里旧 hash 链接 `/#/posts/…`、`/#/paste/<id>`、`/#/manage`、`/#/search?q=…` 跳到对应新地址。
+  - `paste-smoke` 44 项通过，它创建的数据都已删除。
+- 没做：用户在正式域名上重新信任设备（见"待用户处理"）。

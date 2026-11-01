@@ -207,7 +207,7 @@ async function runPublish(
 async function runPasteInvite(config: CliConfig, local: boolean): Promise<number> {
   const siteUrl = local ? "http://localhost:8787" : config.site_url;
   if (!siteUrl) {
-    process.stderr.write(`还没有配置站点地址。在 ${CONFIG_PATH} 里加上 "site_url"，例如 "https://markvault.wangsheng.workers.dev"。\n`);
+    process.stderr.write(`还没有配置站点地址。在 ${CONFIG_PATH} 里加上 "site_url"，例如 "https://blog.liuyun.ac.cn"。\n`);
     return 1;
   }
   const invite = await createInvite(siteUrl, local);

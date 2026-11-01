@@ -758,6 +758,11 @@ site/src/styles/
 2. 按 7.2 的 URL 对应表逐条验证旧链接，并检查文章、图片、搜索、Paste。
 3. 停用 Pages 的 Git 自动构建。
 
+实现补充：
+- 实际顺序是先停用 Pages 自动构建，再推送代码仓库，最后切换域名，避免推送触发一次 `blog_by_vue` 构建。
+- Pages 解绑域名后不会删掉它的 CNAME，而 Worker 自定义域名要求这个名字上没有别的 DNS 记录。wrangler 的令牌没有 DNS 编辑权限，这条 CNAME 要在后台手动删除。
+- 自定义域名写进 `wrangler.jsonc` 的 `routes`（`custom_domain: true`），以后的 `deploy` 会保留它。
+
 ### 阶段 6：清理（切换后观察两周）
 
 - 关闭 DMIT 上的 `markvault-backend` 服务，删除 `apiblog` 的 DNS 记录。

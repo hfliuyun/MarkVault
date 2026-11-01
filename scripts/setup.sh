@@ -87,7 +87,7 @@ say "站点地址"
 if [ -n "$(config_get site_url)" ]; then
   ok "已配置：$(config_get site_url)"
 else
-  config_set site_url "$(ask "站点地址" "https://markvault.wangsheng.workers.dev")"
+  config_set site_url "$(ask "站点地址" "https://blog.liuyun.ac.cn")"
   ok "site_url：$(config_get site_url)"
 fi
 
