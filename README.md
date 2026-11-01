@@ -2,175 +2,80 @@
 
 [简体中文](README.zh-CN.md)
 
-MarkVault is a Markdown-first personal blog system. It keeps article content in a
-plain file tree, serves it through a Flask API, and renders the public site with
-a Vue 3 frontend.
+MarkVault is a Markdown-first personal blog. Posts are ordinary notes in an
+Obsidian vault. A `markvault` command builds them into a static site on your own
+machine and deploys it to Cloudflare Workers (free plan). There is no server to
+run.
 
-The code repository and the content repository are intentionally separated:
-Markdown files are the source of truth for posts, while generated indexes,
-caches, search data, and future sync targets should be rebuildable from the
-content tree.
+## How it works
 
-## Features
+- **Content** lives in the vault, which can be a separate private Git
+  repository. Any note with `publish: true` in its frontmatter is published. The
+  folder layout does not matter.
+- **Pages** are pre-rendered by Astro at build time: posts, series, categories,
+  tags, search (Pagefind) and an about page. Code highlighting (Shiki) and math
+  (KaTeX) are rendered at build time too.
+- **Images** are compressed losslessly and uploaded to Cloudinary on publish. The
+  site serves them from `/img/*` through the Worker, which caches them at the edge
+  and blocks hotlinking.
+- **Paste** is a small cross-device clipboard backed by D1. Devices are trusted
+  with a one-year cookie, paired through a QR code or a 6-digit code.
+- **Publishing** is one command:
+  `markvault publish` validates, uploads new images, builds, deploys and commits
+  the vault. The Obsidian plugin calls the same command.
 
-- Markdown post index built from `content/posts/*/index.md`
-- Series support through `content/series/*/*/index.md`
-- Series descriptions through `content/series/<series-id>/README.md`
-- Stable article URLs based on frontmatter `slug`
-- Category, tag, series, search, and legacy-link APIs
-- Markdown rendering with table-of-contents data
-- Local post images served from each post's `images/` directory
-- TOTP administrator authentication with short-lived JWTs
-- Pastebin-style cross-device clipboard for text and code snippets
-- Article management page for template download, upload publishing, and post list operations
-- Vue 3 frontend with post pages, taxonomy pages, search, series pages, paste pages, and management pages
-- Lightweight post template generator via `manage.py`
-
-## Project Structure
+## Repository layout
 
 ```text
-.
-├── blog_by_vue/       # Vue 3 + Vite frontend
-├── server_flask/      # Flask backend API
-├── docs/              # Architecture, API, requirements, and content guides
-├── manage.py          # Blog maintenance commands
-├── server_flask/data/ # Runtime auth and paste data, ignored by Git
-└── content -> ...     # Optional local symlink to an external content repo
-```
-
-The expected content layout is:
-
-```text
-content/
-  posts/
-    post-slug/
-      index.md
-      images/
-  series/
-    series-id/
-      README.md
-      post-slug/
-        index.md
-        images/
-  legacy/
-    abbrlink-map.json
+packages/content/   vault scanning, frontmatter validation, Markdown rendering
+packages/cli/       the markvault command
+site/               Astro site, Worker (img, Paste API, cron), wrangler.jsonc
+obsidian-plugin/    thin plugin that runs markvault publish / check / unpublish
+scripts/            setup.sh for a new machine, local test helpers
+docs/               architecture, API, content and development guides
 ```
 
 ## Requirements
 
-- Python 3.10+
-- Node.js 20+
-- npm
+- Node.js 22.23 or later
+- A Cloudflare account (Workers free plan) with a D1 database
+- A Cloudinary account for images
+- macOS or Linux
 
 ## Setup
 
-Clone the code repository:
-
 ```sh
-git clone https://github.com/hfliuyun/MarkVault.git markvault
-cd markvault
+git clone https://github.com/hfliuyun/MarkVault.git
+cd MarkVault
+bash scripts/setup.sh
 ```
 
-Prepare a content directory. You can either create a local `content/` directory,
-mount an external content repository at `content/`, or point the backend to an
-external path with `BLOG_CONTENT_ROOT`.
+`setup.sh` installs dependencies, asks for the vault path, runs
+`wrangler login`, stores the Cloudinary credentials in
+`~/.config/markvault/config.json` (mode 600) and finishes with
+`markvault check`.
 
-Example using an external content path:
-
-```sh
-export BLOG_CONTENT_ROOT=/path/to/blog-content
-```
-
-Install backend dependencies:
+## Usage
 
 ```sh
-cd server_flask
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Create the first TOTP administrator secret when admin features are needed:
-
-```sh
-cd ..
-python3 manage.py setup_totp --account admin
-```
-
-Install frontend dependencies:
-
-```sh
-cd blog_by_vue
-npm install
-```
-
-## Development
-
-Start the Flask API:
-
-```sh
-cd server_flask
-source .venv/bin/activate
-python3 run.py
-```
-
-Start the Vue dev server in another terminal:
-
-```sh
-cd blog_by_vue
-npm run dev
-```
-
-The frontend calls the backend under `/api`. In local development, use the Vite
-dev server together with the Flask server.
-
-## Create A Post
-
-From the repository root:
-
-```sh
-python3 manage.py new_post "My First Post" --slug my-first-post
-```
-
-With metadata:
-
-```sh
-python3 manage.py new_post "Logistic Regression" \
-  --slug logistic-regression \
-  --summary "Notes about logistic regression." \
-  --category "Machine Learning" \
-  --tag "Algorithm"
-```
-
-The generator writes to `BLOG_CONTENT_ROOT` when it is set. Otherwise it writes
-to the repository-level `content/` path.
-
-## Build And Test
-
-Backend tests:
-
-```sh
-cd server_flask
-python3 -m unittest test_content_index.py test_markdown_renderer.py test_post_template.py
-python3 -m compileall app test_content_index.py test_markdown_renderer.py test_post_template.py
-```
-
-Frontend production build:
-
-```sh
-cd blog_by_vue
-npm run build
+npm run markvault -- check            # validate all content
+npm run markvault -- preview          # local preview with live reload
+npm run markvault -- publish [note]   # publish everything, or one note
+npm run markvault -- unpublish <note> # set publish: false and republish
+npm run markvault -- deploy           # build and deploy only (code changes)
+npm run markvault -- paste-invite     # one-time link to trust the first device
+npm run typecheck
 ```
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md): architecture and data flow
-- [docs/api.md](docs/api.md): public API reference
-- [docs/content-guide.md](docs/content-guide.md): content layout and frontmatter guide
-- [docs/development-guide.md](docs/development-guide.md): design decisions and coding conventions
-- [docs/changelog.md](docs/changelog.md): implemented features and notable changes
-- [docs/requirements.md](docs/requirements.md): pending requirements
-- [docs/specs/](docs/specs/): archived feature and restructuring designs
+- [docs/architecture.md](docs/architecture.md): components and request flow
+- [docs/content-guide.md](docs/content-guide.md): vault layout, frontmatter and supported syntax
+- [docs/api.md](docs/api.md): Worker routes and the Paste API
+- [docs/development-guide.md](docs/development-guide.md): local development and testing
+- [docs/changelog.md](docs/changelog.md): notable changes
+- [docs/specs/](docs/specs/): design documents, including the
+  [Cloudflare migration design](docs/specs/2026-11-01-cloudflare-migration-design.md)
 
 ## License
 

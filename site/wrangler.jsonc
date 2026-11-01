@@ -25,9 +25,9 @@
   },
   // 每小时清理过期的 paste 和配对码。
   "triggers": { "crons": ["0 * * * *"] },
-  // 正式域名。workers.dev 保留到阶段 6，方便对比。
+  // 只用正式域名，不开 workers.dev，免得同一份内容有两个地址。
   "routes": [{ "pattern": "blog.liuyun.ac.cn", "custom_domain": true }],
-  "workers_dev": true,
+  "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true }
 }

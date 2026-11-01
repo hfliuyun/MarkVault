@@ -24,7 +24,7 @@ interface MarkVaultSettings {
   repoPath: string;
   /** Node.js binary; GUI apps on macOS do not inherit the shell PATH. */
   nodePath: string;
-  /** Optional HTTP proxy for git push / wrangler, e.g. http://127.0.0.1:10808 */
+  /** Optional HTTP proxy for git push / wrangler, e.g. http://127.0.0.1:7890 */
   proxy: string;
   /** Public site address used for "open article" links. */
   siteUrl: string;
@@ -351,7 +351,7 @@ class MarkVaultSettingTab extends PluginSettingTab {
 
     text("MarkVault 仓库路径", "代码仓库的绝对路径（里面有 packages/cli）", "repoPath", "/Users/you/code/MarkVault");
     text("Node 路径", "留空时自动查找 /opt/homebrew/bin/node、/usr/local/bin/node", "nodePath", "/opt/homebrew/bin/node");
-    text("代理（可选）", "git push 和部署需要代理时填写", "proxy", "http://127.0.0.1:10808");
+    text("代理（可选）", "git push 和部署需要代理时填写", "proxy", "http://127.0.0.1:7890");
     text("站点地址（可选）", "发布后用来显示文章链接", "siteUrl", "https://blog.example.com");
   }
 }

@@ -13,18 +13,10 @@ dist/
 dist-ssr/
 *.local
 /content
-server_flask/data/
-
-# Python
-.venv/
-**/.venv*/
-__pycache__/
-*.py[cod]
 
 # Secrets and local config
 .env
 .env.*
-!.env.example
 .dev.vars
 
 # Local tool state

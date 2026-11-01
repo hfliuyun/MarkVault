@@ -1,97 +1,61 @@
 # 仓库协作指南
 
-> **进行中：迁移到 Cloudflare。** 开始任何工作前，先读 `docs/migration-progress.md`（当前状态、下一步、待用户处理）和 `docs/specs/2026-11-01-cloudflare-migration-design.md`（设计）。本文件下面描述的是迁移前的旧架构，会在迁移第 6 阶段更新。每完成一个阶段或独立部分，都要更新 `docs/migration-progress.md`，并和代码放在同一个提交里。
+MarkVault 是一个 Markdown 优先的个人博客。文章写在 Obsidian vault 里，在本机构建成静态站点，部署到 Cloudflare Workers（免费套餐）。完整设计见 `docs/specs/2026-11-01-cloudflare-migration-design.md`，从 Flask + Vue 迁移过来的记录见 `docs/migration-progress.md`。
 
-## 项目结构与模块组织
+**这个仓库是公开的。** 不要提交服务器地址、SSH 用户和密钥路径、token（包括前缀）、zone id、本机绝对路径、设备名这类信息。本机相关的配置放在 `~/.config/markvault/config.json`，不进仓库。
 
-MarkVault 是一个 Markdown 优先的个人博客 / 知识库系统，由 Vue 3 前端和 Flask 后端组成。
+## 项目结构
 
-- `blog_by_vue/`：Vue 3 + Vite 前端。页面位于 `src/views/`，共享组件位于 `src/components/`，API 封装位于 `src/api/`，组合式逻辑位于 `src/composables/`，路由位于 `src/router/`。
-- `obsidian-plugin/`：Obsidian 发布插件（TypeScript + esbuild），把笔记和 images/ 目录直传后端 `/api/posts/upload`；构建方式见其 README。
-- `server_flask/`：Flask 后端 API。公开博客路由位于 `app/api/routes.py`，认证路由位于 `app/api/auth_routes.py`，Pastebin 路由位于 `app/api/paste_routes.py`，应用初始化位于 `app/__init__.py`。
-- `docs/`：架构、API、内容写作、开发规范、需求和变更记录。
-- `docs/specs/`：功能设计和重构设计存档。
-- `manage.py`：仓库级维护命令入口。
+- `packages/content/`：内容层，构建和 CLI 共用。扫描 vault、解析和校验 frontmatter、建立文章 / 系列 / 分类 / 标签索引、渲染 Markdown（`render/`）、读写 `images.json` 和 `published.json`。
+- `packages/cli/`：`markvault` 命令。图片无损压缩和 Cloudinary 上传（`images/`）、修改笔记 frontmatter（`note.ts`）、提交 vault（`git.ts`）、调用 Astro 和 wrangler（`site.ts`）、Paste 邀请链接（`paste.ts`）。
+- `site/`：Astro 站点和 Worker。
+  - `src/pages/`：首页、分页、文章、系列、分类、标签、搜索、关于、404、Paste 三个页面。
+  - `src/components/`、`src/layouts/`、`src/styles/`：页面组件、布局和主题。
+  - `src/lib/vault.ts`：读取 vault 并缓存渲染结果。`src/lib/paste/`：Paste 页面脚本（原生 TS）。
+  - `integrations/markvault.ts`：开发时监听 vault，构建后写 `_redirects`。
+  - `worker/`：`/img/*` 图片转发、`/api/paste/*` 接口、`/paste/<id>` 外壳页、每小时的 Cron。D1 迁移在 `worker/migrations/`。
+  - `wrangler.jsonc`：Worker 配置，正式域名写在 `routes` 里。
+- `obsidian-plugin/`：薄插件，只调用 `markvault publish / check / unpublish`。构建方式见它的 README。
+- `scripts/setup.sh`：新电脑一次性配置。`scripts/dev/`：本地测试脚本。
+- `docs/`：架构、接口、写作指南、开发指南和变更记录。`docs/specs/`：设计存档。
 
-内容目录由 `BLOG_CONTENT_ROOT` 指定；未设置时默认读取仓库级 `content/`。当前索引会扫描 `content/posts/*/` 和 `content/series/*/*/` 下的正文文件，命名支持 `index.md`（旧约定）或 `<slug>.md`（推荐，同一目录并存会报错）。系列简介可写在 `content/series/<series-id>/README.md`。
+内容不在这个仓库里。vault 路径的优先级是 `--vault`、环境变量 `MARKVAULT_VAULT`、配置文件里的 `vault`，最后是仓库下的 `./content`（可以是指向 vault 的软链接，已被 gitignore）。
 
-运行时数据保存在 `server_flask/data/`，包括 TOTP 密钥和 Pastebin JSON 文件，不应提交到 Git。
+## 常用命令
 
-## 后端服务职责
-
-- `content_index.py`：扫描 Markdown、解析 frontmatter、校验 metadata、构建文章/系列/分类/标签索引。
-- `markdown_renderer.py`：Markdown 转 HTML、目录生成、HTML 白名单清洗。
-- `media.py`：重写文章本地图片路径，并提供图片访问。
-- `auth.py`：TOTP 验证、JWT 签发和认证校验。
-- `paste.py`：Pastebin 文本/代码片段存储、读取、列表和过期清理。
-- `post_template.py`：文章模板和 frontmatter 生成。
-- `post_manager.py`：文章模板 ZIP 生成、上传解析、发布写入和文章删除。
-
-## 开发、构建和测试命令
-
-前端命令在 `blog_by_vue/` 下执行：
+需要 Node 22.23 以上。在仓库根目录执行：
 
 ```sh
-cd blog_by_vue
-npm install
-npm run dev
-npm run build
-npm run preview
+npm ci
+npm run markvault -- check          # 校验全部内容
+npm run markvault -- preview        # 本地预览，vault 改动后自动刷新
+npm run markvault -- build          # 构建到 site/dist
+npm run markvault -- publish [笔记]  # 校验、上传图片、构建、部署、提交 vault
+npm run markvault -- deploy         # 只构建和部署（代码改动用）
+npm run typecheck                   # 类型检查
+bash scripts/setup.sh               # 新电脑配置
 ```
 
-后端本地环境：
-
-```sh
-cd server_flask
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python3 run.py
-```
-
-仓库级维护命令：
-
-```sh
-python3 manage.py new_post "文章标题" --slug post-slug
-python3 manage.py setup_totp --account admin
-python3 manage.py reset_totp --account admin
-```
-
-后端检查：
-
-```sh
-cd server_flask
-python3 -m unittest test_content_index.py test_markdown_renderer.py test_post_template.py
-python3 -m compileall app test_content_index.py test_markdown_renderer.py test_post_template.py
-```
-
-## 当前前端路由
-
-- `/`：首页文章列表
-- `/posts/:slug`：文章详情
-- `/p/:abbrlink`：旧链接兼容跳转
-- `/series`、`/series/:seriesId`：系列列表和详情
-- `/categories`、`/categories/:category`：分类列表和详情
-- `/tags`、`/tags/:tag`：标签列表和详情
-- `/search`：搜索结果
-- `/paste`、`/paste/:id`：Paste 创建/管理和公开查看
-- `/manage`：文章管理页面，支持文章列表、模板下载、上传发布和删除
+测试方法和 Paste 本地环境见 `docs/development-guide.md`。
 
 ## 编码风格
 
-Vue 模板、脚本和 CSS 使用 2 空格缩进。组件使用 PascalCase，例如 `PageHeader.vue`。页面文件按页面角色命名，例如 `Home.vue`、`Post.vue`、`PasteHome.vue`。优先使用 ES modules 和顶层 import。
-
-Python 使用 4 空格缩进，函数和变量使用描述性 snake_case。文件读写明确使用 UTF-8。Markdown 文章 slug 要保持稳定，因为公开 URL 和旧链接映射依赖它。
+- TypeScript 和 Astro，2 空格缩进，ES modules，顶层 import。CLI 直接用 Node 的类型擦除运行 `.ts`，不经过编译，所以不要用 enum、namespace 这类需要转换的语法。
+- 文件读写明确使用 UTF-8。
+- 文章 slug 一旦发布就不要改，公开 URL 依赖它。确实要改时在 `redirect_from` 里保留旧值。
+- Paste 页面里的用户内容一律用 `textContent` 写入，不用 `innerHTML`。正文 HTML 只来自构建时经过 rehype-sanitize 白名单的渲染结果。
 
 ## 安全和配置
 
-不要提交虚拟环境、`node_modules/`、生成的 `dist/`、`server_flask/data/` 或本地密钥。涉及上传、删除、认证和保存的接口必须校验输入与权限。前端使用 `v-html` 时只渲染后端清洗过的 Markdown HTML。
-
-依赖更新应限制在实际使用该依赖的子项目内。
+- 不要提交 `node_modules/`、`site/dist/`、`.wrangler/`、`.astro/`、`.tmp/`、`.env*`、`.dev.vars` 或任何密钥。
+- Cloudinary 的 `cloud_name` 不写进 `wrangler.jsonc`，部署时由 CLI 用 `--var` 传入。
+- Worker 的写接口必须校验设备 cookie、`Content-Type: application/json` 和 `Origin`，并限制请求体大小。
+- 同一个 Cloudflare 账号下还有与本项目无关的资源（例如 D1 数据库 `token_monitor_db`），不要动它们。
+- 依赖只加在实际使用它的 workspace 里。
 
 ## 提交规范
 
-提交时要遵守仓库现有的 `.gitmessage` 模板，提交内容尽量按下面结构组织：
+提交时遵守仓库的 `.gitmessage` 模板：
 
 - `type: <short imperative summary>`
 - `Summary`
@@ -99,4 +63,4 @@ Python 使用 4 空格缩进，函数和变量使用描述性 snake_case。文�
 - `Tests`
 - `Notes`
 
-提交信息要简短、祈使句、格式统一；不要把提交写成随意的一行说明。优先复用仓库配置的 commit template，保证每次提交的格式一致。
+提交信息简短、祈使句、格式统一，不要写成随意的一行说明。

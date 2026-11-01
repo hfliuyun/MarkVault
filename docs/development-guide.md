@@ -1,153 +1,69 @@
 # MarkVault 开发指南
 
-本文档记录项目级设计决策和开发规范。内容目录和 frontmatter 细节参见 [content-guide.md](content-guide.md)，后端/前端结构参见 [architecture.md](architecture.md)，接口结构参见 [api.md](api.md)。
+仓库约定和提交规范见 [AGENTS.md](../AGENTS.md)，架构见 [architecture.md](architecture.md)。
 
-## 核心设计理念
+## 原则
 
-### Markdown 为唯一真相源
+- **Markdown 是唯一数据源。** 页面、搜索索引、`images.json` 都能从 vault 重建。线上没有需要备份的文章数据，只有 Paste 存在 D1。
+- **内容和代码分开。** vault 是单独的仓库，代码仓库只放程序。代码仓库是公开的，本机路径和凭据放在 `~/.config/markvault/config.json`。
+- **只有一条部署路径。** 文章和代码改动都通过 `markvault publish` 或 `markvault deploy` 从本机部署。推送代码仓库不会触发任何构建。
+- **校验不过就不部署。** `check` 和构建用的是同一套校验，有错误时线上保持上一个版本。
+- **slug 稳定。** 文章 URL 只由 `slug` 决定，改了就要写 `redirect_from`。
 
-博客的唯一真实数据源必须是 Markdown 文件。数据库、JSON 索引、内存缓存、搜索索引、Paste 运行时数据和未来可能的同步目标都不能替代文章内容本身。
+## 环境
 
-主要原则：
+需要 Node 22.23 以上。CLI 和测试脚本直接用 Node 运行 TypeScript（原生类型擦除），不需要编译。
 
-- 用户主要维护 Markdown 文档和本地图片。
-- 博客从 Markdown frontmatter 中识别文章信息。
-- 文章索引、搜索、分类、标签和系列都必须能从内容目录重建。
-- Notion 可作为展示或备份副本，但不是主数据源。
-
-### 内容与代码分离
-
-代码仓库和内容仓库有意分离。内容树可以放在单独的 Git 仓库，通过 `BLOG_CONTENT_ROOT` 或本地 `content/` 软链接挂载到代码仓库。
-
-`server_flask/data/` 是运行时目录，用于 TOTP 和 Pastebin 数据，不属于文章主数据源，也不应提交。
-
-## 架构决策记录
-
-### URL 与 slug
-
-新博客使用稳定的 `slug` 作为文章 URL 标识：
-
-```text
-/posts/logistic-regression
+```sh
+npm ci
+npm run typecheck                                        # packages/
+node_modules/.bin/tsc --noEmit -p site/tsconfig.json         # Astro 页面和脚本
+node_modules/.bin/tsc --noEmit -p site/worker/tsconfig.json  # Worker
+npm run markvault -- check
 ```
 
-规则：
+不碰真实 vault 的测试方法：复制一份到 `.tmp/`（已被 gitignore），再用 `--vault` 指过去。
 
-- `slug` 从 Markdown frontmatter 读取。
-- 正式文章应手动定义 `slug`。
-- 不从可变标题自动生成长期链接。
-- 旧 `/p/:abbrlink` 只作为兼容路由保留。
-
-### 系列文章 metadata
-
-系列文章使用结构化 metadata：
-
-```yaml
-series:
-  id: machine-learning-basic
-  title: 机器学习基础
-  order: 3
+```sh
+rm -rf .tmp/vault-copy && cp -R content/ .tmp/vault-copy
+npm run markvault -- check --vault .tmp/vault-copy
 ```
 
-规则：
+## 站点
 
-- 有 `series.id` 的文章属于系列。
-- 同一个 `series.id` 的文章聚合成一个系列。
-- 系列内优先按 `series.order` 排序，缺省时排在有序文章之后。
-- `content/series/<series-id>/README.md` 可提供系列简介；其 frontmatter `title` 优先于文章里的 `series.title`。
+- `npm run markvault -- preview`：Astro 开发模式，http://localhost:4321 。vault 有改动时页面自动刷新，`/img/*` 直接读 vault 里的原图。开发模式下没有搜索索引。
+- `npm run markvault -- build`：构建到 `site/dist`，包含 Pagefind 索引和 `_redirects`。
+- `zsh scripts/dev/serve-run.sh <命令>`：在 8787 端口用 `wrangler dev` 托管 `site/dist`，执行完命令后关闭。
+- `node scripts/dev/cdp.mjs <url> <等待毫秒> <JS 表达式>`：用 headless Chrome 打开页面并求值，用来检查页面状态。环境变量 `WIDTH`、`HEIGHT`、`SCHEME=light|dark`、`SHOT=文件.png` 用于截图。
 
-### 图片路径策略
+本机设置了 HTTP 代理时，用 curl 访问 localhost 要加 `--noproxy "*"`。Node 的 `fetch` 默认不读代理环境变量，访问线上地址时加 `NODE_USE_ENV_PROXY=1`。
 
-图片和文章一起保存在文章目录：
+## Worker 和 Paste
 
-```text
-content/posts/logistic-regression/images/sigmoid.png
+本地准备（数据在 `site/.wrangler/`）：
+
+```sh
+cd site
+../node_modules/.bin/wrangler d1 migrations apply markvault --local
+cd .. && npm run markvault -- build && cd site
+../node_modules/.bin/wrangler dev --port 8787 --local --test-scheduled --var CLOUDINARY_CLOUD:<cloud_name>
 ```
 
-Markdown 中使用相对路径：
+- 访问 http://localhost:8787/__scheduled 手动触发 Cron。
+- `npm run markvault -- paste-invite --local` 生成本地邀请链接。
+- `node scripts/dev/paste-smoke.mjs <邀请链接>` 跑 44 项接口检查，只删除它自己创建的数据。去掉 `--local` 生成线上链接，就能对线上跑同样的检查。
 
-```md
-![sigmoid](images/sigmoid.png)
+新的表结构改动加在 `site/worker/migrations/` 下的新文件里，用 `wrangler d1 migrations apply markvault --remote` 应用到线上。
+
+## 部署
+
+```sh
+npm run markvault -- deploy     # 只改了代码时
+npm run markvault -- publish    # 内容有变化时（还会上传图片、提交 vault）
 ```
 
-后端负责把本地图片路径转换为浏览器可访问的 media API URL。
+两者都会用 `--var CLOUDINARY_CLOUD:<cloud_name>` 调用 `wrangler deploy`，`cloud_name` 来自本机配置。正式域名在 `site/wrangler.jsonc` 的 `routes` 里，`workers.dev` 地址已关闭。
 
-### 草稿与发布策略
+## Obsidian 插件
 
-当前不支持草稿、隐藏和置顶：
-
-- `draft`
-- `hidden`
-- `pinned`
-
-文章只要进入可扫描的 `content/posts/*/index.md` 或 `content/series/*/*/index.md` 路径，并且 frontmatter 合法，就会被视为已发布。
-
-### 旧文章兼容策略
-
-旧文章只作为文件备份保留，不进入新索引。恢复旧文章时，应手动迁移到新内容结构，并通过以下方式保留旧链接映射：
-
-- 新文章 frontmatter 中的 `legacy.abbrlinks`
-- `content/legacy/abbrlink-map.json`
-
-不要再使用 Python `hash(title)` 生成长期链接。
-
-### Web 管理功能定位
-
-网页管理功能不做完整 CMS。当前 `/manage` 页面提供文章列表、模板下载、上传发布和文章删除，仍然以 Markdown 文件为主数据源；用户可以通过模板生成结构化文章目录，再在本地编辑 Markdown。设计存档见 [specs/2026-06-17-article-management-design.md](specs/2026-06-17-article-management-design.md)。
-
-## 编码规范
-
-### 前端
-
-- Vue 模板、脚本和 CSS 使用 2 空格缩进。
-- 组件使用 PascalCase，例如 `PageHeader.vue`。
-- 页面视图按页面角色命名，例如 `Home.vue`、`Post.vue`、`PasteHome.vue`。
-- API 调用集中放在 `blog_by_vue/src/api/`，避免组件中散落 URL。
-- 复用全局 CSS 变量和现有玻璃面板风格，优先保证阅读体验。
-
-### 后端
-
-- Python 使用 4 空格缩进。
-- 函数和变量使用描述性 snake_case。
-- 文件读写明确使用 UTF-8。
-- 路由层只做 HTTP 参数处理和响应组织，核心逻辑放到服务层。
-- 上传、删除、认证等管理操作必须校验权限和输入。
-
-### Commit Message
-
-使用简短祈使句：
-
-```text
-Add blog post editor validation
-Fix Markdown render route
-Document Pastebin auth flow
-```
-
-## 安全策略
-
-Markdown 渲染后的 HTML 必须经过白名单清洗，前端 `v-html` 只渲染后端清洗过的内容。
-
-允许范围：
-
-- 常用 Markdown 标签：标题、段落、列表、引用、链接、图片、代码块、表格、脚注相关标签。
-- 必要属性：标题 `id`、链接 `href/title`、图片 `src/alt/title`、代码 `class`、表格对齐属性。
-
-禁止范围：
-
-- `script`、`style`、`iframe` 等可执行或嵌入型危险块。
-- `javascript:`、事件属性和其他危险协议。
-
-TOTP 密钥、Pastebin 数据、JWT 签名材料和其他运行时数据必须留在 `server_flask/data/` 或环境变量中，不应提交。
-
-## 参考文档
-
-- [requirements.md](requirements.md)：待实现功能需求
-- [changelog.md](changelog.md)：已完成功能归档
-- [architecture.md](architecture.md)：架构和数据流
-- [content-guide.md](content-guide.md)：frontmatter 规范和目录结构
-- [api.md](api.md)：公开 API 参考
-
-### Notion Sync
-要运行 Notion 同步，需在 `server_flask/.env` 配置:
-- `NOTION_API_TOKEN`: Notion 机器人的集成 Token
-- `NOTION_DATABASE_ID`: 目标 Database ID
+在 `obsidian-plugin/` 下构建，方法见它的 README。插件只调用 CLI，不保存任何凭据。

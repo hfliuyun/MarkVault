@@ -353,7 +353,7 @@ markvault migrate                  # 一次性迁移旧内容格式（见第 9 �
 
 ```json
 {
-  "vault": "/Users/yun/code/blog-content",
+  "vault": "~/code/blog-content",
   "cloudinary": { "cloud_name": "…", "api_key": "…", "api_secret": "…" }
 }
 ```
@@ -768,6 +768,8 @@ site/src/styles/
 - 关闭 DMIT 上的 `markvault-backend` 服务，删除 `apiblog` 的 DNS 记录。
 - 按 7.1 删除旧代码和旧文档，更新 `AGENTS.md`、`docs/architecture.md`、`docs/content-guide.md`、`docs/development-guide.md`、`docs/api.md`。
 - 在 `docs/changelog.md` 里记录这次迁移。
+
+**实现补充**：切换后验证全部通过，用户确认后在切换当天完成，没有等两周。另外删除了 `docs/requirements.md`（只有旧系统的需求）、`scripts/import-legacy-pastes.mjs`，并关闭了 workers.dev 地址（`workers_dev: false`）。仓库是公开的，`docs/migration-progress.md` 里的服务器和账号信息一并删掉。
 
 ## 10. 风险和待验证事项
 

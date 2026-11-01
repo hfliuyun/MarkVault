@@ -2,7 +2,7 @@
 
 ## 背景与问题
 
-当前 Phase 1 已实现"本地 Markdown → Notion"的同步，核心逻辑在 [notion_sync.py](file:///Users/yun/code/MarkVault/server_flask/app/services/notion_sync.py) 和 [mistletoe_notion.py](file:///Users/yun/code/MarkVault/server_flask/app/services/mistletoe_notion.py)。
+当前 Phase 1 已实现"本地 Markdown → Notion"的同步，核心逻辑在 [notion_sync.py](../../server_flask/app/services/notion_sync.py) 和 [mistletoe_notion.py](../../server_flask/app/services/mistletoe_notion.py)。
 
 现有流程：
 1. 扫描所有 `index.md`，用 MD5 content hash 判断内容是否变化

@@ -1,6 +1,23 @@
 # MarkVault 实现日志
 
-本文档记录已完成的功能和实现历史，用于追溯和参考。当前版本的待实现需求参见 [需求清单](requirements.md)。
+本文档记录已完成的功能和实现历史，用于追溯和参考。
+
+## 迁移到 Cloudflare Workers（2026-11）
+
+设计见 [Cloudflare 迁移设计](specs/2026-11-01-cloudflare-migration-design.md)，过程见 [迁移记录](migration-progress.md)。
+
+- 去掉 Flask 后端、Vue 前端和 VPS。站点由 Astro 在本机预渲染，部署到 Cloudflare Workers 免费套餐，正式域名直接绑定 Worker。
+- 内容改为 Obsidian vault：`publish: true` 的笔记才发布，目录结构不影响 URL，系列是 `type: series` 笔记。`markvault migrate` 把旧格式一次性转换过来。
+- 新的 `markvault` CLI：`check`、`preview`、`build`、`publish`、`unpublish`、`deploy`、`paste-invite`、`migrate`。Obsidian 插件改为只调用 CLI。
+- 渲染在构建时完成：Shiki 代码高亮、KaTeX 公式、Obsidian 语法（wikilink、callout、图片嵌入、高亮、注释）、rehype-sanitize 白名单。搜索改用 Pagefind。
+- 图片发布时无损压缩并上传 Cloudinary，经 Worker `/img/*` 提供，带边缘缓存和防盗链，Cloudinary 开启 Strict Transformations。
+- Paste 改为 Worker + D1，用设备信任（一年 cookie、二维码、6 位配对码、终端一次性链接）代替 TOTP。旧数据已导入。
+- 路由从 hash 改为真实路径，旧 hash 链接和 `/p/<abbrlink>` 会跳转到新地址。
+- 删除：网页文章管理、TOTP 登录、Notion 同步、GitHub Actions 部署、Pages 项目。
+
+## Flask + Vue 时期
+
+以下各节记录迁移前的旧系统，相关代码已经删除，只作历史参考。
 
 ## 基础能力（Phase 1）
 
@@ -264,7 +281,7 @@
 
 ## 参考文档
 
-- [需求清单](requirements.md)：当前待实现功能需求
-- [开发指南](development-guide.md)：架构决策和开发规范
-- [架构文档](architecture.md)：简要架构和数据流
-- [内容写作指南](content-guide.md)：frontmatter 规范和目录结构
+- [架构](architecture.md)
+- [写作指南](content-guide.md)
+- [接口](api.md)
+- [开发指南](development-guide.md)

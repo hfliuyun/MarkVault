@@ -1,224 +1,112 @@
-# MarkVault 内容写作指南
+# MarkVault 写作指南
 
-本文档说明文章目录、frontmatter、系列简介、旧链接、图片和 slug 规范。架构说明参见 [architecture.md](architecture.md)，接口说明参见 [api.md](api.md)。
+文章就是 Obsidian vault 里的普通笔记。本文说明哪些笔记会发布、frontmatter 怎么写、支持哪些语法，以及怎么发布。规则的完整说明见[迁移设计](specs/2026-11-01-cloudflare-migration-design.md)第 3、4 节。
 
-## 内容目录
+## vault 结构
 
-独立文章放在 `content/posts/` 下：
+目录结构由你决定。构建会扫描整个 vault，只收录 frontmatter 里写了 `publish: true` 的笔记。文件名和所在目录都不影响 URL，可以随便重命名、移动。
 
-```text
-content/posts/logistic-regression/
-  logistic-regression.md
-  images/
-    sigmoid.png
+不扫描的目录：`.obsidian`、`.markvault`、`.git`、`.stfolder`、`.trash`、`.tmp.driveupload`、`node_modules`，以及配置文件 `ignore` 里列出的目录（相对 vault 根目录，比如模板目录）。
+
+一种可行的结构：
+
+```
+blog-content/
+├── 音视频数据流基础/
+│   ├── 音视频数据流基础.md       ← 系列笔记（type: series）
+│   ├── 音频流基础：PCM、WAV 与 AAC.md
+│   └── images/
+├── 独立文章/
+│   ├── 逻辑回归.md
+│   └── images/
+├── 日记/                         ← 没有 publish: true，不会发布
+└── .markvault/                   ← 工具维护，跟 Markdown 一起提交
+    ├── images.json
+    └── published.json
 ```
 
-系列文章可以按系列分组：
-
-```text
-content/series/machine-learning-basic/logistic-regression/
-  logistic-regression.md
-  images/
-    sigmoid.png
-```
-
-系列目录可以添加简介文件：
-
-```text
-content/series/machine-learning-basic/README.md
-```
-
-## 正文文件命名
-
-正文文件支持两种命名，二选一：
-
-- `<slug>.md`（推荐）：例如 `logistic-regression.md`。Obsidian 中每篇笔记唯一命名，快速切换（Cmd+O）和链接补全不会歧义。`manage.py new_post` 与网页模板 ZIP 均使用此命名。
-- `index.md`（旧约定）：继续支持，已有文章无需迁移。
-
-同一目录两种命名并存会被索引判定为错误。使用 `<slug>.md` 时文件名必须与 frontmatter 的 `slug` 一致。
-
-推荐配合 Obsidian 的设置：关闭 `[[Wikilinks]]`（后端只渲染标准 Markdown 链接）、新链接格式选「相对路径」、新附件位置设为「当前文件夹的子文件夹 `images`」——粘贴截图会自动落到 `images/` 并生成正确的相对路径。
-
-目录路径只用于本地组织。公开文章 URL 仍然来自 frontmatter 中的 `slug`，系列归属仍然来自 frontmatter 中的 `series` 字段。
-
-如果内容在单独仓库中，可以把外部仓库挂载到代码仓库的 `content/`，也可以通过 `BLOG_CONTENT_ROOT` 指向外部路径。
-
-## 创建文章
-
-在仓库根目录使用模板生成器：
-
-```sh
-python3 manage.py new_post "文章标题" --slug example-post
-```
-
-命令会创建：
-
-```text
-content/posts/example-post/
-  index.md
-  images/
-```
-
-可以提供摘要、分类和标签：
-
-```sh
-python3 manage.py new_post "逻辑回归" \
-  --slug logistic-regression \
-  --summary "逻辑回归学习笔记。" \
-  --category 机器学习 \
-  --tag 算法 \
-  --tag 监督学习
-```
-
-也可以生成带系列 metadata 的文章：
-
-```sh
-python3 manage.py new_post "博客内容索引" \
-  --slug blog-content-index \
-  --series-id blog-system \
-  --series-title 博客系统重构 \
-  --series-order 2
-```
-
-生成器会拒绝覆盖已有 `content/posts/<slug>/` 目录。如果设置了 `BLOG_CONTENT_ROOT`，会写入该路径；否则写入仓库级 `content/`。
-
-## Frontmatter
-
-必填字段：
-
-- `title`：文章标题
-- `slug`：稳定 URL 标识
-- `date`：发布时间，支持 `YYYY-MM-DD HH:mm:ss` 或 `YYYY-MM-DD`
-
-推荐字段：
-
-- `summary`：文章摘要
-- `categories`：分类列表
-- `tags`：标签列表
-
-可选字段：
-
-- `series`：系列信息
-- `legacy`：旧链接映射
-- `notion`：未来 Notion 同步信息
-
-独立文章示例：
+## 文章 frontmatter
 
 ```yaml
 ---
-title: Git 基本操作
-slug: git-basic
-date: 2022-01-20 10:00:00
-summary: 常用 Git 命令和基本工作流记录。
-categories:
-  - 工具
-tags:
-  - Git
----
-```
-
-系列文章示例：
-
-```yaml
----
-title: 逻辑回归
-slug: logistic-regression
-date: 2022-01-29 14:40:13
-summary: 逻辑回归的基本原理、损失函数和梯度推导。
-categories:
-  - 机器学习
-tags:
-  - 算法
-  - 逻辑回归
-series:
-  id: machine-learning-basic
-  title: 机器学习基础
-  order: 1
----
-```
-
-## 系列简介
-
-系列简介文件位于：
-
-```text
-content/series/<series-id>/README.md
-```
-
-README 可以包含可选 frontmatter：
-
-```yaml
----
-title: 机器学习基础
----
-```
-
-正文使用 Markdown 编写，会在系列列表页和系列详情页完整展示。若 README frontmatter 提供 `title`，它会优先作为系列显示标题；否则使用文章 metadata 中的 `series.title`。
-
-系列规则：
-
-- 拥有相同 `series.id` 的文章属于同一系列。
-- 系列详情页优先按 `series.order` 排序。
-- 没有 `series.order` 的文章排在有序文章之后。
-- 没有 README 的系列仍然正常显示，简介为空。
-
-## 旧链接
-
-旧 `/p/:abbrlink` 链接只通过显式映射跳转，不再使用 Python `hash(title)` 生成长期链接。
-
-推荐在新文章 frontmatter 中添加：
-
-```yaml
+publish: true                      # 必填。不写或为 false 就不发布
+slug: aac-stream                   # 必填。第一次 publish 时工具会帮你填，之后不要改
+date: 2026-06-30 23:29             # 必填。第一次 publish 时自动填当前时间
+updated: 2026-07-02                # 可选。显示"最后更新"
+title: 音频流基础：PCM、WAV 与 AAC  # 可选。不写就用文件名
+summary: 从音频采集全链路出发……      # 可选
+categories: [音视频流基础]           # 可选
+tags: [AAC, PCM, ADTS, WAV]         # 可选
+series: "[[音视频数据流基础]]"        # 可选。指向一篇系列笔记
+series_order: 2                    # 可选。系列内的排序
+redirect_from: [old-slug]          # 可选。改过 slug 时让旧地址继续能访问
 legacy:
-  abbrlinks:
-    - f9b01ad8
+  abbrlinks: [a1b2c3d4]            # 可选。旧博客 /p/<abbrlink> 链接
+---
 ```
 
-批量映射可以写入：
+- `slug` 只能用小写字母、数字和单个连字符，并且在所有文章和系列之间唯一。URL 是 `/posts/<slug>/`。
+- `date` 可以写 `YYYY-MM-DD`、`YYYY-MM-DD HH:mm`、`YYYY-MM-DD HH:mm:ss` 或 ISO 8601。没写时区的按 `Asia/Shanghai` 处理。
+- Obsidian 自带的 `aliases`、`cssclasses` 可以保留。其他未知字段只给警告。
+- frontmatter 必须从文件第一行开始，前面有空行就不会被识别。
 
-```text
-content/legacy/abbrlink-map.json
+## 系列
+
+系列也是一篇笔记，用 `type: series` 标记，正文就是系列简介：
+
+```yaml
+---
+publish: true
+type: series
+slug: av-stream-basics             # 系列 id，URL 是 /series/av-stream-basics/
+title: 音视频数据流基础              # 可选。不写就用文件名
+---
+整个音视频的开发流程经历下面几步……
 ```
 
-示例：
+文章用 `series: "[[音视频数据流基础]]"` 指向它。系列内先按 `series_order` 升序，没写 `series_order` 的排在后面，再按 `date` 排。
 
-```json
-{
-  "f9b01ad8": "logistic-regression"
-}
-```
+## 支持的语法
 
-JSON 的值必须是新文章 `slug`。
+| 语法 | 处理方式 |
+|---|---|
+| CommonMark + GFM（表格、任务列表、删除线、脚注） | 支持 |
+| `$...$`、`$$...$$` | 构建时用 KaTeX 渲染 |
+| 代码块 | 构建时用 Shiki 高亮，浅色和深色主题各一套 |
+| ` ```mermaid ` | 只在有图的页面加载 mermaid |
+| `[[笔记]]`、`[[笔记\|文字]]`、`[[笔记#标题]]` | 指向已发布的笔记时生成站内链接，否则只输出文字并警告 |
+| `![[图片.png]]`、`![](images/图片.png)` | 换成 `/img/<hash>.webp` |
+| `![[图片.png\|300]]`、`![[图片.png\|raw]]` | `300` 是显示宽度；`raw` 表示不转 WebP，用原图 |
+| `> [!note] 标题`、`> [!tip]-` | callout，带 `-` 或 `+` 的可以折叠 |
+| `==高亮==` | `<mark>` |
+| `%%注释%%`、`^block-id` | 删除 |
+| `![[另一篇笔记]]` | 不支持嵌入，降级为链接并警告 |
+| 原始 HTML | 允许，但会经过白名单过滤 |
+
+中文标点紧挨 `**` 的写法（`**“编码”**决定`）也能正确加粗。图片路径里不能有未编码的空格：写成 `%20`，或者改用 `![[...]]`。
 
 ## 图片
 
-图片应放在文章自己的 `images/` 目录：
+- 图片原件放在 vault 里，Markdown 里写本地引用即可，不用关心线上地址。
+- `publish` 时，新图片先无损压缩（逐像素比对），再上传到 Cloudinary，`images.json` 记录 hash 和尺寸。hash 基于原件，所以压缩工具升级不会让图片地址变化。
+- 图片原件不进 Git，需要自己备份。`images.json` 会提交，所以只有 Markdown 和 `images.json` 的电脑也能构建，不需要原件。
 
-```text
-content/posts/logistic-regression/images/sigmoid.png
-content/series/machine-learning-basic/logistic-regression/images/sigmoid.png
+## 校验
+
+`markvault check` 和每次构建执行同一套校验。只要有一项报错，构建就失败，线上继续使用上一个版本。
+
+报错：必填字段缺失或格式不对、slug 重复（包括和系列、`redirect_from` 重复）、`series` 指向的笔记不存在或不是系列、图片既不在本地也不在 `images.json` 里、同一个 abbrlink 指向两篇文章、图片路径有空格、frontmatter 无法解析。
+
+警告：wikilink 指向未发布的笔记、未知字段、之前发布过的 slug 这次不见了而且没写进 `redirect_from`（URL 会变成 404）、frontmatter 前有空行。
+
+## 发布
+
+```sh
+npm run markvault -- publish 独立文章/逻辑回归.md   # 发布一篇新笔记
+npm run markvault -- publish                      # 只是重新发布全部内容
+npm run markvault -- unpublish 独立文章/逻辑回归.md
 ```
 
-Markdown 中使用相对路径：
+指定笔记时，工具会写入 `publish: true`，没有 `slug` 时让你确认一个（`--slug` 可以直接给出），没有 `date` 时写入当前时间。然后依次校验、上传新图片、构建、部署，最后提交并推送 vault（`--no-git` 跳过这一步，推送失败只给警告）。
 
-```md
-![sigmoid](images/sigmoid.png)
-```
-
-后端会在渲染文章详情时把本地图片路径改写成浏览器可访问的媒体 API 地址。
-
-## Slug 规范
-
-- 使用小写英文、数字和连字符。
-- 发布后保持稳定。
-- 不要从可变标题自动生成最终 slug。
-- 规范文章 URL 为 `/posts/:slug`。
-
-## 7. 同步到 Notion (Notion Sync)
-系统提供了单向同步工具，将本地 Markdown 文章发布到 Notion 数据库以供阅读。
-- **增量更新**: 基于正文和元数据的 MD5 Hash 指纹，跳过未修改的文章。
-- **自动图片上传**: 检测到本地图片时，自动调用 Notion File Upload API 将二进制上传到 Notion 并在页面内呈现为原生 Image 区块。
-- **命令执行**: 
-  ```bash
-  python3 manage.py notion_sync
-  ```
+在 Obsidian 里可以用插件的「发布当前笔记」「检查」「取消发布当前笔记」命令，效果相同。

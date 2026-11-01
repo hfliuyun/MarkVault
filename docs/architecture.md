@@ -1,132 +1,63 @@
 # MarkVault 架构
 
-本文档说明 MarkVault 的系统结构、后端服务层、前端路由、核心数据流和运行时存储。内容写作规范参见 [content-guide.md](content-guide.md)，接口细节参见 [api.md](api.md)。
+本文是简要说明。完整设计和每个决定的原因见 [Cloudflare 迁移设计](specs/2026-11-01-cloudflare-migration-design.md)。
 
-## 架构原则
+## 组件
 
-MarkVault 以 Markdown 文件作为文章内容的唯一真实数据源。文章索引、缓存、搜索结果、分类标签和未来可能的同步目标都必须能从 `content/` 重新构建。
+```
+发布机（本机）
+  vault（Obsidian，单独的私有 Git 仓库）
+    ├─ *.md                      文章和系列
+    ├─ .markvault/images.json    图片清单（hash → 线上地址）
+    └─ .markvault/published.json 已发布的 slug，用来发现失效的 URL
+  代码仓库（本仓库）
+    ├─ packages/content   扫描、校验、渲染，构建和 CLI 共用
+    ├─ packages/cli       markvault 命令
+    ├─ site/              Astro 站点 + Worker
+    └─ obsidian-plugin/   调用 markvault 的薄插件
 
-代码仓库和内容仓库可以分离：内容目录可以是仓库内的 `content/`，也可以是外部仓库，通过 `BLOG_CONTENT_ROOT` 指向。
+markvault publish
+  校验 → 新图片无损压缩 → Cloudinary → 更新 images.json
+  → astro build → wrangler deploy → 提交并推送 vault
 
-## 后端结构
-
-Flask 后端位于 `server_flask/`，主要分为路由层、服务层和模型层。
-
-路由层：
-
-- `app/api/routes.py`：文章、系列、分类、标签、搜索、媒体和旧接口兼容。
-- `app/api/auth_routes.py`：TOTP 验证、JWT 状态检查和绑定信息查询。
-- `app/api/paste_routes.py`：Pastebin 创建、查看、列表和删除。
-- `app/api/__init__.py`：统一创建并注册 API Blueprint。
-
-服务层：
-
-- `app/services/content_index.py`：扫描 `content/posts/*/index.md` 和 `content/series/*/*/index.md`，构建内存索引。
-- `app/services/markdown_renderer.py`：渲染 Markdown、生成 TOC、清洗 HTML。
-- `app/services/media.py`：处理文章本地图片路径与图片访问。
-- `app/services/auth.py`：管理 TOTP 密钥、验证码校验、JWT 签发和验证。
-- `app/services/paste.py`：管理 Paste JSON 文件和过期清理。
-- `app/services/post_template.py`：生成文章模板 frontmatter。
-- `app/services/post_manager.py`：生成模板 ZIP、校验上传 ZIP、发布文章目录和删除文章。
-
-模型层：
-
-- `app/models/post.py`：文章数据模型和元数据序列化。
-
-文章管理功能已实现，后端通过 `manage_routes.py` 暴露管理接口，前端通过 `/manage` 页面提供文章列表、模板下载、上传发布和删除。原始设计见 [specs/2026-06-17-article-management-design.md](specs/2026-06-17-article-management-design.md)。
-
-## 内容数据流
-
-```text
-content/posts/*/index.md
-content/series/*/*/index.md
-content/series/<series-id>/README.md
-  -> ContentIndex
-  -> Flask API
-  -> Vue 页面
+Cloudflare Worker "markvault"（免费套餐，绑定正式域名）
+  静态资源：全部预渲染页面、CSS/JS、Pagefind 索引、_redirects、Paste 页面外壳
+  Worker 脚本：
+    /img/*        Referer 检查 → 边缘缓存 → Cloudinary
+    /api/paste/*  Paste 接口和设备信任 → D1
+    /paste/<id>   返回 Paste 查看页外壳
+    Cron 每小时   清理过期的 paste 和配对码
 ```
 
-文章详情 API 返回 metadata、渲染后的 HTML、目录 TOC 和系列相邻文章。前端在页面中处理 KaTeX、代码高亮、代码复制和标题跳转。
+只有 `/api/*`、`/img/*` 和 `/paste/*` 会先经过 Worker（`wrangler.jsonc` 里的 `run_worker_first`）。其余请求直接由静态资源返回，不计入 Worker 的请求数。
 
-系列简介来自 `content/series/<series-id>/README.md`，后端会渲染为 `description_html`，并在系列列表和系列详情接口中返回。
+## 数据存在哪里
 
-## 认证数据流
+| 数据 | 数据源 | 丢了怎么办 |
+|---|---|---|
+| 文章、系列 | vault | 从内容仓库 clone |
+| 图片原件 | vault（不进 Git） | 从备份恢复 |
+| 线上图片 | Cloudinary | 用原件重新压缩、上传 |
+| `images.json`、`published.json` | vault | 重新扫描 vault 生成 |
+| 线上页面 | 构建产物 | 重新 `markvault publish` |
+| Paste、已信任的设备 | D1 | D1 Time Travel |
+| Cloudinary 凭据、vault 路径 | `~/.config/markvault/config.json` | 重新运行 `scripts/setup.sh` |
 
-```text
-python3 manage.py setup_totp
-  -> server_flask/data/auth/
-  -> POST /api/auth/verify
-  -> JWT
-  -> Authorization: Bearer <token>
-  -> 受保护 API
+## 请求流程
+
+- **文章页**：边缘直接返回预渲染的 HTML。代码高亮和公式在构建时生成，页面只带少量 JS（代码复制、目录高亮、移动端菜单、按需加载的 mermaid）。
+- **图片**：HTML 里的地址是 `/img/<hash>.webp`。Worker 检查 Referer，先查 `caches.default`，没命中再向 Cloudinary 取。响应头是一年加 `immutable`。
+- **Paste**：`/paste/` 是静态外壳，页面脚本调用 `/api/paste/*`。Worker 用 `mv_device` cookie 识别已信任的设备。
+- **旧链接**：`/p/<abbrlink>` 和 `redirect_from` 里的旧 slug 由构建时生成的 `_redirects` 做 308 跳转。旧前端的 hash 路由（`/#/posts/...`）由页面里的内联脚本换成真实路径。
+
+## 内容渲染
+
+渲染管线在 `packages/content/src/render/`：
+
+```
+remark-parse → remark-gfm → remark-cjk-friendly → remark-math → remark-obsidian
+→ remark-rehype → rehype-raw → rehype-sanitize（白名单）
+→ rehype-katex → Shiki → 标题 id 和目录
 ```
 
-管理员先通过 CLI 生成 TOTP 密钥，再用认证器应用获得 6 位动态码。前端通过 `/api/auth/verify` 换取短期 JWT，并在需要认证的请求中带上 `Authorization` 请求头。
-
-## Pastebin 数据流
-
-```text
-/paste
-  -> /api/paste
-  -> server_flask/data/pastes/*.json
-  -> /paste/:id
-```
-
-创建、列表和删除 Paste 需要登录；公开查看单个 Paste 不需要登录。过期 Paste 会在读取或列表时清理。
-
-## 文章管理数据流
-
-```text
-/manage
-  -> /api/manage/posts
-  -> /api/posts/template
-  -> /api/posts/upload
-  -> DELETE /api/posts/:slug
-  -> content/posts/ 或 content/series/
-```
-
-管理页面复用 TOTP/JWT 鉴权。模板下载不会在服务器创建文章；上传 ZIP 会解析 frontmatter，并根据是否存在 `series.id` 写入独立文章目录或系列文章目录。
-
-## 前端结构
-
-Vue 前端位于 `blog_by_vue/`：
-
-- `src/views/`：页面级组件。
-- `src/components/`：共享组件和文章详情子组件。
-- `src/api/`：后端接口封装。
-- `src/composables/`：认证、Markdown 增强和标题导航等复用逻辑。
-- `src/router/index.js`：Hash 路由配置。
-- `src/style.css`：全局样式和主题变量。
-
-当前路由：
-
-- `/`：文章列表
-- `/posts/:slug`：文章详情
-- `/p/:abbrlink`：旧链接跳转
-- `/series`、`/series/:seriesId`：系列列表和详情
-- `/categories`、`/categories/:category`：分类列表和详情
-- `/tags`、`/tags/:tag`：标签列表和详情
-- `/search`：搜索结果
-- `/paste`、`/paste/:id`：Paste 创建/管理和公开查看
-- `/manage`：文章管理页面
-
-## 存储结构
-
-- `content/`：文章 Markdown、系列 README、图片和旧链接映射。
-- `server_flask/data/auth/`：TOTP 运行时密钥。
-- `server_flask/data/pastes/`：Pastebin JSON 数据。
-- `blog_by_vue/dist/`：前端构建产物。
-
-`server_flask/data/`、虚拟环境、`node_modules/` 和构建产物不应提交。
-
-## 扩展点
-
-后续可以添加派生存储或同步目标，但不能改变 Markdown 作为第一主数据源的原则：
-
-- 生成式 `index.json`
-- SQLite 缓存
-- 搜索索引
-- Markdown 到 Notion 的单向同步
-
-## Notion Sync 架构
-同步机制 (`notion_sync.py`) 使用 `mistletoe` AST 解析器提取 Markdown 抽象语法树，遍历生成原生 Notion Blocks。为了保证高效的远程 API 同步，避免因 `git` 操作刷新 `mtime` 而引发的误判，脚本采用 **MD5 内容指纹 (Hash)** 缓存策略。这与本地服务器热重载使用的基于文件系统的 `stat` 策略（注重内存响应效率）形成对比。
+先用白名单过滤正文里的原始 HTML，再交给 KaTeX 和 Shiki。它们生成的 HTML 是可信的。

@@ -1,530 +1,72 @@
-# MarkVault API
+# MarkVault 接口
 
-所有接口都挂载在 `/api` 下。公开博客接口读取 `BLOG_CONTENT_ROOT` 指向的内容目录；如果未设置该环境变量，则读取仓库级 `content/`。
+博客页面都是静态文件，没有文章接口。Worker 只处理图片和 Paste。实现在 `site/worker/`。
 
-## 认证
+## 图片
 
-管理类接口使用 TOTP 动态码换取短期 JWT。运行时认证数据保存在 `server_flask/data/`，不应提交。
+| 路径 | 说明 |
+|---|---|
+| `GET /img/<hash>.webp` | 位图转成 WebP（最大宽度 1600）。`hash` 是原件 sha256 的前 16 位 |
+| `GET /img/<hash>.<ext>` | svg、gif 等不转换的格式 |
+| `GET /img/raw/<hash>.<ext>` | 原图（压缩后），用于 `![[图片|raw]]` |
 
-首次绑定：
+- Referer 既不是本站、也不在 `IMG_REFERER_ALLOW`（逗号分隔的域名，含子域名）里时返回 403。没有 Referer 时放行。
+- 响应带 `Cache-Control: public, max-age=31536000, immutable`，并写入边缘缓存。上游失败的响应不缓存。
+- 不符合上面格式的路径返回 404。
 
-```sh
-python3 manage.py setup_totp --account admin
-```
+## Paste
 
-如需重置密钥：
+所有接口都在 `/api/paste/` 下，返回 JSON。
 
-```sh
-python3 manage.py reset_totp --account admin
-```
+### 权限
 
-需要认证的请求必须携带：
+- **公开**：任何人都能调用。
+- **已信任**：需要有效的 `mv_device` cookie，否则返回 401。
+- 所有非 GET 请求的 `Origin` 必须是本站，否则返回 403。带请求体的接口要求 `Content-Type: application/json`，否则返回 415。
+- 路径不存在返回 404，方法不对返回 405。
+- 请求体上限：普通接口 7MB，配对和改名接口 4KB。超过返回 413。
 
-```text
-Authorization: Bearer <jwt-token>
-```
+### 设备 cookie
 
-### `POST /api/auth/verify`
+`mv_device` 是 32 字节随机数，`HttpOnly; Secure; SameSite=Lax; Path=/api/paste`，有效期 365 天。D1 里只存它的 SHA-256。距离上次使用超过 24 小时的请求会重新下发 cookie，所以一年内用过一次就不用重新配对。
 
-验证 6 位 TOTP 动态码并返回 JWT。
+### 路由
 
-请求体：
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/paste/session` | 公开 | `{ trusted, device }` |
+| GET | `/api/paste/items?limit=20&before=<cursor>` | 已信任 | 最近的 paste，每页最多 20 条。5 万字符以内的条目带完整内容。返回 `{ items, next_cursor }` |
+| POST | `/api/paste/items` | 已信任 | `{ content, title, language, expires_in }`。`expires_in` 是 `1h`、`1d`（默认）、`1w` 或 `never`。内容最大 1MB |
+| GET | `/api/paste/items/:id` | 公开 | 单条 paste。已过期返回 404 |
+| DELETE | `/api/paste/items/:id` | 已信任 | 删除 |
+| POST | `/api/paste/pair-codes` | 已信任 | 生成 6 位配对码和二维码链接，2 分钟内有效 |
+| POST | `/api/paste/pair` | 公开 | `{ code }` 或 `{ token }`，加上 `name`。成功后下发 cookie |
+| GET | `/api/paste/devices` | 已信任 | 设备列表 |
+| PATCH | `/api/paste/devices/:id` | 已信任 | `{ name }`，改名 |
+| DELETE | `/api/paste/devices/:id` | 已信任 | 移除设备，可以移除自己 |
 
-```json
-{
-  "code": "123456"
-}
-```
+paste id 是 8 位小写字母和数字。
 
-成功响应：
+### 配对
 
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "expires_in": 7200
-}
-```
+- **终端邀请**：`markvault paste-invite` 在本机生成 token，用 `wrangler d1 execute` 写入它的 hash（10 分钟有效），然后打印 `https://<域名>/paste/pair/#t=<token>` 和二维码。能写 D1 就说明是站点主人，所以 Worker 里没有管理密钥。
+- **添加设备**：已信任的设备调用 `pair-codes`，新设备扫码，或者输入 6 位码。配对码最多输错 5 次。
+- token 放在 URL 片段里，不会发到服务器，也不会进 Workers 日志。`/paste/pair/` 只显示确认页，点按钮后才调用 `POST /api/paste/pair`。这样聊天软件预先抓取链接时，token 不会被提前用掉。
 
-错误：
+### 数据和清理
 
-- `400`：尚未配置 TOTP
-- `401`：验证码无效
+表结构在 `site/worker/migrations/0001_init.sql`。Cron 每小时删除过期的 paste，以及过期或已使用的配对码。读取单条 paste 时也会判断是否过期，所以不依赖 Cron 的执行时间。
 
-### `POST /api/auth/device_token`
+## 页面路由
 
-验证 6 位 TOTP 动态码并返回长期设备令牌（30 天），供 Obsidian 发布插件等本地可信客户端使用。验证逻辑与 `/api/auth/verify` 相同，仅有效期不同。
-
-请求体：
-
-```json
-{
-  "code": "123456"
-}
-```
-
-成功响应：
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "expires_in": 2592000
-}
-```
-
-错误：
-
-- `400`：尚未配置 TOTP
-- `401`：验证码无效
-
-### `GET /api/auth/status`
-
-检查当前 Bearer token 是否有效。
-
-成功响应：
-
-```json
-{
-  "authenticated": true
-}
-```
-
-未登录或 token 无效：
-
-```json
-{
-  "authenticated": false
-}
-```
-
-### `GET /api/auth/provisioning-uri`
-
-已移除：TOTP 绑定改为在服务器终端执行 `python3 manage.py setup_totp` 完成扫码，不再提供线上接口。
-
-## Pastebin
-
-Paste 数据以 JSON 文件形式保存在 `server_flask/data/pastes/`。
-
-### `POST /api/paste`
-
-创建 Paste。需要认证。
-
-请求体：
-
-```json
-{
-  "content": "print('hello world')",
-  "title": "Example",
-  "language": "python",
-  "expires_in": "1d"
-}
-```
-
-`expires_in` 支持 `1h`、`1d`、`1w` 和 `never`，默认值为 `1d`。
-
-成功响应：
-
-```json
-{
-  "id": "a1b2c3d4",
-  "title": "Example",
-  "content": "print('hello world')",
-  "language": "python",
-  "created_at": "2026-06-16T23:00:00+08:00",
-  "expires_at": "2026-06-17T23:00:00+08:00",
-  "url": "/paste/a1b2c3d4"
-}
-```
-
-### `GET /api/paste/:id`
-
-公开读取单个 Paste。不存在或已过期时返回 `404`。
-
-### `GET /api/pastes`
-
-列出未过期 Paste。需要认证。列表项不包含正文 `content`。
-
-### `DELETE /api/paste/:id`
-
-删除 Paste。需要认证。
-
-## 文章
-
-### `GET /api/posts`
-
-返回按发布时间倒序排列的分页文章列表。
-
-查询参数：
-
-- `page`：页码，默认 `1`
-- `size`：每页数量，默认 `10`
-
-响应示例：
-
-```json
-{
-  "total": 1,
-  "page": 1,
-  "size": 1,
-  "articles": [
-    {
-      "title": "逻辑回归",
-      "slug": "logistic-regression",
-      "date": "2022-01-29 14:40:13",
-      "summary": "逻辑回归的基本原理、损失函数和梯度推导。",
-      "categories": ["机器学习"],
-      "tags": ["算法", "逻辑回归", "监督学习"],
-      "series": {
-        "id": "machine-learning-basic",
-        "title": "机器学习基础",
-        "order": 1
-      }
-    }
-  ]
-}
-```
-
-### `GET /api/posts/:slug`
-
-返回渲染后的文章详情。
-
-响应示例：
-
-```json
-{
-  "title": "逻辑回归",
-  "slug": "logistic-regression",
-  "date": "2022-01-29 14:40:13",
-  "summary": "逻辑回归的基本原理、损失函数和梯度推导。",
-  "categories": ["机器学习"],
-  "tags": ["算法", "逻辑回归", "监督学习"],
-  "series": {
-    "id": "machine-learning-basic",
-    "title": "机器学习基础",
-    "order": 1
-  },
-  "content": "<h2 id=\"...\">...</h2>",
-  "toc": [
-    {
-      "level": 2,
-      "title": "逻辑回归是什么",
-      "id": "逻辑回归是什么"
-    }
-  ],
-  "series_posts": []
-}
-```
-
-错误：
-
-- `404`：文章不存在
-- `500`：内容索引错误，例如重复 slug 或 metadata 不合法
-
-## 系列
-
-### `GET /api/series`
-
-返回所有系列，按最近更新时间倒序排列。
-
-响应示例：
-
-```json
-{
-  "series": [
-    {
-      "id": "machine-learning-basic",
-      "title": "机器学习基础",
-      "count": 1,
-      "updated_at": "2022-01-29 14:40:13",
-      "description_html": "<p>...</p>"
-    }
-  ]
-}
-```
-
-### `GET /api/series/:series_id`
-
-返回单个系列及其文章。系列内文章优先按 `series.order` 排序，没有 order 的文章排在后面。
-
-响应示例：
-
-```json
-{
-  "id": "machine-learning-basic",
-  "title": "机器学习基础",
-  "count": 1,
-  "updated_at": "2022-01-29 14:40:13",
-  "description_html": "<p>...</p>",
-  "posts": [
-    {
-      "title": "逻辑回归",
-      "slug": "logistic-regression",
-      "date": "2022-01-29 14:40:13",
-      "summary": "逻辑回归的基本原理、损失函数和梯度推导。",
-      "categories": ["机器学习"],
-      "tags": ["算法", "逻辑回归", "监督学习"]
-    }
-  ]
-}
-```
-
-错误：
-
-- `404`：系列不存在
-- `500`：内容索引错误
-
-系列简介规则：
-
-- `content/series/<series-id>/README.md` 可以包含可选 frontmatter 和 Markdown 正文。
-- README frontmatter 中的 `title` 会覆盖 API 响应中的系列标题。
-- README 不存在时，`description_html` 为空字符串。
-- README 正文会渲染为经过清洗的 HTML 并完整返回。
-
-## 分类和标签
-
-### `GET /api/categories`
-
-返回所有分类及文章数量。
-
-### `GET /api/categories/:category`
-
-返回指定分类下的文章列表。
-
-### `GET /api/tags`
-
-返回所有标签及文章数量。
-
-### `GET /api/tags/:tag`
-
-返回指定标签下的文章列表。
-
-## 搜索
-
-### `GET /api/search`
-
-按关键词搜索标题、摘要、Markdown 正文、分类和标签。
-
-查询参数：
-
-- `q`：搜索关键词
-
-空关键词返回空结果，不视为错误。
-
-响应示例：
-
-```json
-{
-  "query": "逻辑回归",
-  "total": 1,
-  "articles": [
-    {
-      "title": "逻辑回归",
-      "slug": "logistic-regression",
-      "date": "2022-01-29 14:40:13",
-      "summary": "逻辑回归的基本原理、损失函数和梯度推导。",
-      "categories": ["机器学习"],
-      "tags": ["算法", "逻辑回归", "监督学习"]
-    }
-  ]
-}
-```
-
-错误：
-
-- `500`：内容索引错误
-
-## 媒体
-
-文章本地图片通过以下接口提供：
-
-```text
-GET /api/media/posts/:slug/images/:filename
-```
-
-Markdown 中推荐写法：
-
-```md
-![alt](images/file.png)
-```
-
-后端在渲染文章详情 HTML 时会把上述路径改写为媒体接口地址。
-
-## 旧接口兼容
-
-旧接口保留用于迁移和兼容，不建议新前端继续依赖。
-
-`GET /api/p/:abbrlink` 会通过显式映射解析旧链接：
-
-- 文章 frontmatter 中的 `legacy.abbrlinks`
-- `content/legacy/abbrlink-map.json`
-
-找到映射时返回永久跳转：
-
-```text
-308 Location: /api/posts/:slug
-```
-
-没有映射时返回未迁移错误。
-
-其他旧接口：
-
-- `GET /api/posts_list_metadata`
-- `GET /api/md/:abbrlink`
-- `POST /api/upload_image`
-- `POST /api/save_post`
-
-## 文章管理
-
-文章管理接口需要认证，前端入口为 `/manage`。
-
-### `GET /api/manage/posts`
-
-返回全部文章的管理列表，不分页，并额外包含文章所在位置。
-
-响应示例：
-
-```json
-{
-  "total": 1,
-  "articles": [
-    {
-      "title": "逻辑回归",
-      "slug": "logistic-regression",
-      "date": "2022-01-29 14:40:13",
-      "summary": "逻辑回归的基本原理。",
-      "categories": ["机器学习"],
-      "tags": ["算法"],
-      "series": {
-        "id": "machine-learning-basic",
-        "title": "机器学习基础",
-        "order": 1
-      },
-      "location": "series"
-    }
-  ]
-}
-```
-
-`location` 为 `posts` 或 `series`。
-
-### `POST /api/posts/template`
-
-根据请求体生成文章模板 ZIP 并下载。该接口不会在服务器创建文章文件。
-
-请求体示例：
-
-```json
-{
-  "title": "逻辑回归",
-  "slug": "logistic-regression",
-  "summary": "逻辑回归学习笔记。",
-  "categories": ["机器学习"],
-  "tags": ["算法", "监督学习"],
-  "series_id": "machine-learning-basic",
-  "series_title": "机器学习基础",
-  "series_order": 1
-}
-```
-
-成功时返回 `application/zip`，文件名为 `<slug>.zip`。ZIP 内包含 `<slug>/<slug>.md` 和空的 `<slug>/images/` 目录。
-
-错误：
-
-- `400`：标题为空、slug 不合法或系列排序参数不合法
-- `409`：slug 已存在
-
-### `POST /api/posts/upload`
-
-上传文章 ZIP，校验后发布到内容目录。支持两种请求形式：
-
-- **multipart 表单**（浏览器）：字段 `file`（ZIP 文件）+ `overwrite`（字符串 `true`/`false`）
-- **原始请求体**（脚本/插件）：`Content-Type: application/zip` 直接携带 ZIP 二进制，`overwrite` 走查询参数
-
-成功响应：
-
-```json
-{
-  "message": "Post published successfully",
-  "slug": "logistic-regression",
-  "location": "series",
-  "path": "content/series/machine-learning-basic/logistic-regression/"
-}
-```
-
-上传规则：
-
-- 正文文件支持 `index.md`（旧约定）或 `<slug>.md`（推荐）命名，同一目录并存会报错。
-- 支持顶层结构（`index.md`）和 `<slug>/` 子目录结构。
-- 允许 Markdown 和常见图片格式。
-- ZIP 最大 50MB。
-- frontmatter 必须包含合法的 `title`、`slug` 和 `date`。
-- 有 `series.id` 时写入 `content/series/<series-id>/<slug>/`，否则写入 `content/posts/<slug>/`。
-
-错误：
-
-- `400`：缺少文件、不是 ZIP、结构不合法或 metadata 不合法
-- `409`：slug 已存在且未允许覆盖
-
-### `DELETE /api/posts/:slug`
-
-删除指定文章目录。需要认证。
-
-成功响应：
-
-```json
-{
-  "message": "Post deleted",
-  "slug": "logistic-regression"
-}
-```
-
-错误：
-
-- `404`：文章不存在
-
-### `GET /api/manage/posts/:slug/raw`
-
-读取文章原始内容，供在线编辑和 Obsidian 插件拉取使用。需要认证。
-
-成功响应：
-
-```json
-{
-  "slug": "logistic-regression",
-  "path": "posts/logistic-regression/logistic-regression.md",
-  "frontmatter": "title: 逻辑回归\nslug: logistic-regression",
-  "body": "## 逻辑回归\n\n...",
-  "raw": "---\ntitle: 逻辑回归\nslug: logistic-regression\n---\n\n## 逻辑回归\n\n..."
-}
-```
-
-错误：
-
-- `404`：文章不存在
-
-### `PUT /api/manage/posts/:slug/content`
-
-替换文章正文。frontmatter 保持原样不动，保存后内容索引热重载，页面即刻生效。需要认证。
-
-请求体：
-
-```json
-{
-  "body": "## 逻辑回归\n\n更新后的正文。"
-}
-```
-
-成功响应：
-
-```json
-{
-  "path": "posts/logistic-regression/logistic-regression.md",
-  "message": "Post updated"
-}
-```
-
-错误：
-
-- `400`：`body` 缺失或不是字符串
-- `404`：文章不存在
-
-详细设计见 [specs/2026-06-17-article-management-design.md](specs/2026-06-17-article-management-design.md)。
+| 路径 | 说明 |
+|---|---|
+| `/`、`/page/<n>/` | 首页和分页 |
+| `/posts/<slug>/` | 文章 |
+| `/series/`、`/series/<id>/` | 系列 |
+| `/categories/`、`/categories/<名称>/` | 分类 |
+| `/tags/`、`/tags/<名称>/` | 标签 |
+| `/search/?q=…` | 搜索（Pagefind） |
+| `/about/` | 关于 |
+| `/paste/`、`/paste/<id>`、`/paste/pair/` | Paste 首页、查看、配对 |
+| `/p/<abbrlink>` | 旧链接，308 跳转到文章 |

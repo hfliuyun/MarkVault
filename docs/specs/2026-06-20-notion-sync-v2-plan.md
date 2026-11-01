@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3, `python-frontmatter`, `requests`, `threading.Timer`, `unittest` with `unittest.mock`
 
-**Design Spec:** [`docs/specs/2026-06-20-notion-sync-v2-design.md`](file:///Users/yun/code/MarkVault/docs/specs/2026-06-20-notion-sync-v2-design.md)
+**Design Spec:** [`docs/specs/2026-06-20-notion-sync-v2-design.md`](2026-06-20-notion-sync-v2-design.md)
 
 ---
 
@@ -1389,7 +1389,7 @@ def handle_notion_sync(args: argparse.Namespace) -> int:
 
 Run:
 ```bash
-cd /Users/yun/code/MarkVault && python3 -m compileall manage.py
+cd MarkVault && python3 -m compileall manage.py
 ```
 Expected: `Compiling ... OK`
 
@@ -1442,7 +1442,7 @@ Expected: All existing tests still PASS
 ```bash
 cd server_flask
 python3 -m compileall app/services/notion_image_cache.py app/services/notion_sync_state.py app/services/notion_sync.py
-cd /Users/yun/code/MarkVault
+cd MarkVault
 python3 -m compileall manage.py
 ```
 Expected: All files compile OK

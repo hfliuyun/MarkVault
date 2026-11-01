@@ -2,167 +2,65 @@
 
 [English](README.md)
 
-MarkVault 是一个 Markdown 优先的个人知识库系统。它把内容保存在普通的 Markdown 文件树中，通过 Flask API 提供数据，并使用 Vue 3 前端渲染公开站点。
+MarkVault 是一个 Markdown 优先的个人博客。文章就是 Obsidian vault 里的普通笔记。`markvault` 命令在本机把它们构建成静态站点，部署到 Cloudflare Workers（免费套餐），不需要自己运行服务器。
 
-代码仓库和内容仓库有意分离：Markdown 文件是文章的唯一主数据源，生成索引、缓存、搜索数据以及未来可能的同步目标都应该可以从内容目录重新构建。
+## 工作方式
 
-## 功能
+- **内容**放在 vault 里，vault 可以是单独的私有 Git 仓库。frontmatter 写了 `publish: true` 的笔记才会发布，放在哪个文件夹都可以。
+- **页面**在构建时由 Astro 预渲染：文章、系列、分类、标签、搜索（Pagefind）和关于页。代码高亮（Shiki）和公式（KaTeX）也在构建时生成。
+- **图片**在发布时无损压缩并上传到 Cloudinary。站点通过 Worker 的 `/img/*` 提供图片，在边缘缓存，并且防盗链。
+- **Paste** 是一个跨设备剪贴板，数据存在 D1。设备用一年有效的 cookie 信任，通过二维码或 6 位配对码添加。
+- **发布**只需要一条命令：`markvault publish` 会校验、上传新图片、构建、部署，并提交 vault。Obsidian 插件调用的也是这条命令。
 
-- 从 `content/posts/*/index.md` 构建 Markdown 文章索引
-- 支持 `content/series/*/*/index.md` 形式的系列文章
-- 支持 `content/series/<series-id>/README.md` 形式的系列简介
-- 文章访问地址基于 frontmatter 中稳定的 `slug`
-- 提供分类、标签、系列、搜索和旧链接兼容 API
-- 渲染 Markdown，并返回目录数据
-- 支持从每篇文章的 `images/` 目录提供本地图片
-- TOTP 管理员认证，使用短期 JWT 保护管理接口
-- Pastebin 跨设备剪贴板，支持文本/代码片段、语法高亮和过期时间
-- 文章管理页面，支持模板下载、上传发布、文章列表和删除
-- Vue 3 前端包含文章页、分类页、标签页、搜索页、系列页、Paste 页面和管理页面
-- 通过 `manage.py` 提供轻量文章模板生成命令
-
-## 项目结构
+## 仓库结构
 
 ```text
-.
-├── blog_by_vue/       # Vue 3 + Vite 前端
-├── server_flask/      # Flask 后端 API
-├── docs/              # 架构、API、需求和内容写作文档
-├── manage.py          # 博客维护命令
-├── server_flask/data/ # 运行时认证和 paste 数据，不提交
-└── content -> ...     # 可选：指向外部内容仓库的本地软链接
-```
-
-期望的内容目录结构：
-
-```text
-content/
-  posts/
-    post-slug/
-      index.md
-      images/
-  series/
-    series-id/
-      README.md
-      post-slug/
-        index.md
-        images/
-  legacy/
-    abbrlink-map.json
+packages/content/   扫描 vault、校验 frontmatter、渲染 Markdown
+packages/cli/       markvault 命令
+site/               Astro 站点、Worker（图片、Paste 接口、Cron）、wrangler.jsonc
+obsidian-plugin/    薄插件，调用 markvault publish / check / unpublish
+scripts/            新电脑配置脚本 setup.sh、本地测试脚本
+docs/               架构、接口、写作和开发指南
 ```
 
 ## 环境要求
 
-- Python 3.10+
-- Node.js 20+
-- npm
+- Node.js 22.23 以上
+- Cloudflare 账号（Workers 免费套餐）和一个 D1 数据库
+- Cloudinary 账号（存放图片）
+- macOS 或 Linux
 
-## 安装
-
-克隆代码仓库：
+## 配置
 
 ```sh
-git clone https://github.com/hfliuyun/MarkVault.git markvault
-cd markvault
+git clone https://github.com/hfliuyun/MarkVault.git
+cd MarkVault
+bash scripts/setup.sh
 ```
 
-准备内容目录。你可以在仓库内创建本地 `content/` 目录，把外部内容仓库挂载到 `content/`，也可以通过 `BLOG_CONTENT_ROOT` 让后端读取外部路径。
+`setup.sh` 会安装依赖、询问 vault 路径、执行 `wrangler login`、把 Cloudinary 凭据写入 `~/.config/markvault/config.json`（权限 600），最后运行 `markvault check`。
 
-使用外部内容路径的示例：
-
-```sh
-export BLOG_CONTENT_ROOT=/path/to/blog-content
-```
-
-安装后端依赖：
+## 使用
 
 ```sh
-cd server_flask
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-需要使用管理功能时，先创建 TOTP 管理员密钥：
-
-```sh
-cd ..
-python3 manage.py setup_totp --account admin
-```
-
-安装前端依赖：
-
-```sh
-cd blog_by_vue
-npm install
-```
-
-## 本地开发
-
-启动 Flask API：
-
-```sh
-cd server_flask
-source .venv/bin/activate
-python3 run.py
-```
-
-在另一个终端启动 Vue 开发服务器：
-
-```sh
-cd blog_by_vue
-npm run dev
-```
-
-前端会通过 `/api` 调用后端。本地开发时同时运行 Vite 开发服务器和 Flask 服务。
-
-## 创建文章
-
-在仓库根目录执行：
-
-```sh
-python3 manage.py new_post "我的第一篇文章" --slug my-first-post
-```
-
-带元数据的示例：
-
-```sh
-python3 manage.py new_post "逻辑回归" \
-  --slug logistic-regression \
-  --summary "逻辑回归学习笔记。" \
-  --category "机器学习" \
-  --tag "算法"
-```
-
-如果设置了 `BLOG_CONTENT_ROOT`，生成器会写入该路径；否则会写入仓库级 `content/` 路径。
-
-## 构建与测试
-
-后端测试：
-
-```sh
-cd server_flask
-python3 -m unittest test_content_index.py test_markdown_renderer.py test_post_template.py
-python3 -m compileall app test_content_index.py test_markdown_renderer.py test_post_template.py
-```
-
-前端生产构建：
-
-```sh
-cd blog_by_vue
-npm run build
+npm run markvault -- check            # 校验全部内容
+npm run markvault -- preview          # 本地预览，改动后自动刷新
+npm run markvault -- publish [笔记]    # 发布全部内容，或者发布指定笔记
+npm run markvault -- unpublish <笔记>  # 改成 publish: false 并重新发布
+npm run markvault -- deploy           # 只构建和部署（代码改动用）
+npm run markvault -- paste-invite     # 生成一次性链接，信任第一台设备
+npm run typecheck
 ```
 
 ## 文档
 
-- [docs/architecture.md](docs/architecture.md)：架构和数据流
-- [docs/api.md](docs/api.md)：公开 API 参考
-- [docs/content-guide.md](docs/content-guide.md)：内容目录和 frontmatter 指南
-- [docs/development-guide.md](docs/development-guide.md)：架构决策和开发规范
-- [docs/changelog.md](docs/changelog.md)：已完成功能和变更记录
-- [docs/requirements.md](docs/requirements.md)：待实现需求
-- [docs/specs/](docs/specs/)：功能设计和重构规格存档
+- [docs/architecture.md](docs/architecture.md)：组件和请求流程
+- [docs/content-guide.md](docs/content-guide.md)：vault 结构、frontmatter 和支持的语法
+- [docs/api.md](docs/api.md)：Worker 路由和 Paste 接口
+- [docs/development-guide.md](docs/development-guide.md)：本地开发和测试
+- [docs/changelog.md](docs/changelog.md)：主要变更
+- [docs/specs/](docs/specs/)：设计文档，包括 [Cloudflare 迁移设计](docs/specs/2026-11-01-cloudflare-migration-design.md)
 
-## 开源协议
+## 许可证
 
-MarkVault 使用 MIT 协议开源。详见 [LICENSE](LICENSE)。
+MarkVault 使用 MIT 许可证，详见 `LICENSE`。

@@ -21,7 +21,7 @@
 |---|---|
 | MarkVault 仓库路径 | 代码仓库的绝对路径，里面要有 `packages/cli` |
 | Node 路径 | macOS 的图形界面程序拿不到终端里的 PATH；留空时会依次查找 `/opt/homebrew/bin/node`、`/usr/local/bin/node` |
-| 代理（可选） | `git push` 和部署需要走代理时填写，例如 `http://127.0.0.1:10808` |
+| 代理（可选） | `git push` 和部署需要走代理时填写，例如 `http://127.0.0.1:7890` |
 | 站点地址（可选） | 发布完成后显示文章链接 |
 
 Cloudinary 和 Cloudflare 的凭据不保存在插件里，由仓库里的 `scripts/setup.sh` 配置在本机（`~/.config/markvault/config.json` 和 `wrangler login`）。

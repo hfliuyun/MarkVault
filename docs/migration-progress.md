@@ -1,126 +1,42 @@
-# Cloudflare 迁移进度记录
+# Cloudflare 迁移记录
 
-这份文件用于在不同的 agent 工具之间接续工作。**每完成一个阶段或一个独立部分，都要更新这里，并和对应代码放在同一个提交里。**
+MarkVault 从 Flask + Vue + VPS 迁移到 Cloudflare Workers 的过程记录。迁移在 2026-11-01 完成。设计以 [迁移设计](specs/2026-11-01-cloudflare-migration-design.md) 为准，这里只记录各阶段的结果、偏离设计的决定和验证情况。
 
-## 接手时按顺序阅读
+这个仓库是公开的，所以服务器地址、账号 id、本机路径这类环境信息不写在这里。
 
-1. `AGENTS.md`：仓库约定和提交规范（`.gitmessage` 模板）。
-2. `docs/specs/2026-11-01-cloudflare-migration-design.md`：完整设计。以它为准，偏离设计时先在下面"决策记录"里写明原因。
-3. `docs/specs/2026-11-01-theme-prototype.html`：视觉原型，用浏览器打开。
-4. 本文件的"当前状态"和"下一步"。
-5. `git log --oneline -20`。
-
-## 更新规则
-
-- 完成一项就把状态改成"完成"，写上提交号。
-- 在"会话日志"末尾追加一条：日期、做了什么、验证了什么、没做完的事。
-- 发现设计需要调整时，同时修改设计文档，并在"决策记录"里写明原因。
-- 需要用户手动处理的事项写进"待用户处理"，不要假设它已经完成。
-
-## 当前状态
-
-**阶段 0 到 5 已完成，正式站点 https://blog.liuyun.ac.cn 已经由 Worker `markvault` 提供。** 下一步是阶段 6（清理），按设计先观察两周，2026-11-15 前后开始。代码仓库已推送，旧 Pages 项目的 Git 自动构建已关闭。
+## 各阶段
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
 | 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 完成 | 代码 `dbf0deb`；vault `ee21fc2` |
 | 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
-| 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成，已部署预览 | 见 git log |
+| 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成 | 见 git log |
 | 3 | 无损压缩、Cloudinary 上传、`/img/*` Worker、`publish`/`unpublish`、`published.json`、Obsidian 插件 0.2、`scripts/setup.sh` | 完成 | 见 git log；vault `e884a74` |
 | 4 | Paste：Worker、D1、设备信任、旧数据导入 | 完成 | `ced4448` |
-| 5 | 切换域名到 Worker | 完成（2026-11-01 14:09） | 见 git log |
-| 6 | 清理旧代码、更新文档、下线 DMIT | 未开始 | |
-
-### 阶段 0 明细
-
-| 事项 | 状态 |
-|---|---|
-| 代码仓库：删除临时脚本和工具缓存，补充 `.gitignore` | 完成（`dbf0deb`） |
-| 代码仓库：提交设计文档、主题原型、本文件 | 完成（`763db12`） |
-| vault：`.gitignore`、停止跟踪图片、提交迁移前快照，推送到 `origin` | 完成（`ee21fc2`） |
-| D1：`markvault`，区域 APAC，`database_id` = `003333e1-03a1-4990-a3ef-08e6d6c87ee8` | 完成（阶段 4 建表，迁移 `0001_init.sql`） |
-| 备份 DMIT 的内容目录和 `server_flask/data/`，与 vault 做 diff | 完成（见"环境事实"） |
-| Cloudinary：账号已注册，凭据已由用户填进 `~/.config/markvault/config.json` | 完成；Strict Transformations 在阶段 3 开启 |
-
-## 待用户处理
-
-0. **在正式域名上重新信任设备**：cookie 按域名保存，workers.dev 上的信任在 blog.liuyun.ac.cn 上不算。运行 `npm run markvault -- paste-invite`（现在打印的是正式域名的链接）信任电脑，再在 https://blog.liuyun.ac.cn/paste/ 点「添加设备」配对手机。workers.dev 上的两台设备（`Mac · Safari`、`Android · Chrome`）可以在设备列表里移除，或者等一年后 Cron 自动清理。
-1. ~~在 Cloudinary 后台开启 Strict Transformations~~：2026-11-01 完成并验证。
-2. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
-3. **不要再打开 Syncthing 和 DMIT 之间的同步。** 切换后博客已经不依赖 DMIT，阶段 6 会直接关掉那台服务器上的服务。
-4. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
-
-## 环境事实
-
-- 代码仓库：`/Users/yun/code/MarkVault`，远端 `origin/main`。
-- vault 和内容仓库：`/Users/yun/code/blog-content`，远端 `https://github.com/hfliuyun/blog-vault.git`（私有，`main`）。代码仓库里的 `content/` 是指向它的软链接。根目录下有一个空的 `.tmp.driveupload/`，可能是某个云盘客户端留下的。
-- 本机配置：`~/.config/markvault/config.json`，`vault` 已设为上面的路径。
-- 本机工具：Node v26.10.0、npm 11.19.1、`/opt/homebrew/bin/jpegtran`。没有 oxipng、gifsicle、svgo，阶段 3 改用 npm 包（wasm 或自带二进制），不依赖 Homebrew。`wrangler` 已登录（用 `npx wrangler`，版本 4.156）。账号下另有一个与本项目无关的 D1 数据库 `token_monitor_db`，不要动它。
-- DMIT 服务器：
-  - 地址 `179.255.146.211`，用户 root。私钥在 `~/Library/CloudStorage/OneDrive-个人/应用/ssh_key/DMIT-X1rp8JVmad-id_rsa/id_rsa.pem`，使用时复制到 `.tmp/ssh/` 并设为 600，用完删除。
-  - SSH 要走本机代理：`-o ProxyCommand="nc -X 5 -x 127.0.0.1:10808 %h %p"`。
-  - 线上服务以用户 `aa` 运行：代码在 `/home/aa/MarkVault`，内容在 `/home/aa/blog-content`（软链接 `content`），systemd 用户服务是 `markvault-backend`（gunicorn 监听 127.0.0.1:8000）。`/root/MarkVault` 是另一份旧副本，没有在用。
-- DMIT 的备份在 `.tmp/server-backup/dmit-20261101.tar.gz`，已解压在同一目录（`.tmp/` 被 gitignore）。里面有：
-  - 内容目录，和迁移前的 vault 快照 `ee21fc2` 完全一致，只多了一个插件上传的重复目录（见下一条）。
-  - `server_flask/data/pastes/` 下的 2 条 paste（`g27h8h3t`、`3cy3ladc`，都是永不过期），阶段 4 导入 D1。
-  - `totp_secret.key` 和 Notion 同步状态文件，迁移后都不再需要。
-- **2026-11-01 发现线上 API 一直返回 500**，有两个原因：
-  - sub2api 那篇的 frontmatter 是坏的。
-  - 插件把 h264 那篇按 `series.id` 又写了一份到 `series/av-stream-basics/h264-stream/`，造成 slug 重复。
-
-  已经在服务器上修好：修正了那篇的 title 行，删掉了这个重复目录（内容和原文完全相同，备份里有）。现在 `/api/posts` 返回 200，共 11 篇。服务器上其余内容仍是旧格式，旧站点会一直以这个状态运行到切换。
-- 正式域名 `blog.liuyun.ac.cn`（zone `liuyun.ac.cn`，id `0d081b69c6e620553fbfa1fb05b68991`）从 2026-11-01 14:09 起绑定 Worker `markvault`，写在 `site/wrangler.jsonc` 的 `routes` 里。workers.dev 地址保留到阶段 6。
-- 旧前端是 Pages 项目 `markvaultfront`（`markvault.pages.dev`）：自定义域名已解绑，Git 自动构建已关闭（`deployments_enabled: false`），项目和历史部署还在，阶段 6 删除。旧版里 `blog_by_vue/functions/api/[[catchall]].js` 把 `/api/*` 转发到 `https://apiblog.liuyun.ac.cn`，也就是 DMIT 上的 Flask。`apiblog` 的 DNS 记录还在。
-- wrangler 的 OAuth 令牌没有 DNS 编辑权限（只有 `zone (read)`）。给 Worker 绑域名前，这个名字上不能有别的 DNS 记录，所以旧 CNAME 是用户在后台手动删的。Pages 项目的设置可以用这个令牌通过 API 修改。
-- 本机网络到 Cloudflare 自定义域名的连接很不稳定（经代理或直连都是这样，切换前的旧 Pages 站也一样慢），偶尔连接超时或传输卡住。Worker 日志显示请求本身都是几毫秒完成。测试脚本要加重试，不要把一次超时当成站点故障。
-- 前端使用 hash 路由（`createWebHashHistory`），所以旧链接都是 `/#/...` 形式。
-- 没有 `legacy/abbrlink-map.json`，文章里也没有 `legacy.abbrlinks`，所以 `/p/:abbrlink` 目前没有需要映射的旧链接。
+| 5 | 切换域名到 Worker | 完成（2026-11-01 14:09） | `71375dd` |
+| 6 | 清理旧代码、更新文档、下线旧服务器 | 完成（2026-11-01） | 见 git log |
 
 ## 决策记录
 
 | 日期 | 决策 | 原因 |
 |---|---|---|
-| 2026-11-01 | 去掉 Flask 和 DMIT，全部用 Cloudflare Workers 免费套餐 | 现在性能差；用户不想维护 Python 后端 |
-| 2026-11-01 | 不用 R2 和 Cloudflare Access | 都需要绑信用卡，用户的账号没有绑卡 |
+| 2026-11-01 | 去掉 Flask 和 VPS，全部用 Cloudflare Workers 免费套餐 | 原来性能差；不想维护 Python 后端 |
+| 2026-11-01 | 不用 R2 和 Cloudflare Access | 都需要绑信用卡 |
 | 2026-11-01 | 图片放 Cloudinary，通过 `/img/*` Worker 转发、缓存、防盗链 | 免费且不用绑卡；Markdown 里只写本地引用，换图床不用改文章 |
 | 2026-11-01 | 上传前无损压缩，hash 基于原件 | 减少 Cloudinary 存储；压缩工具版本变化不影响 hash |
 | 2026-11-01 | 本机构建、本机部署，发布核心是 `markvault` CLI，Obsidian 插件只调用 CLI | 不打开 Obsidian 也能发布；换电脑跑 `setup.sh` 即可 |
-| 2026-11-01 | Paste 用设备信任（一年 cookie + 配对码 / 终端一次性链接），不用 TOTP | 用户每次输入验证码就不想用了 |
+| 2026-11-01 | Paste 用设备信任（一年 cookie + 配对码 / 终端一次性链接），不用 TOTP | 每次输入验证码太麻烦，就不想用了 |
 | 2026-11-01 | 前端改用 Astro，博客和 Paste 都不用 Element Plus | 静态 HTML 最快；见设计文档第 7、8 节 |
-| 2026-11-01 | 视觉按原型：纸 / 夜 / 素三套主题加跟随系统，只用系统字体 | 用户希望简洁；Google Fonts 在国内慢 |
-| 2026-11-01 | 去掉网页编辑、文章管理页、Notion 同步 | 用户确认不再需要 |
+| 2026-11-01 | 视觉按原型：纸 / 夜 / 素三套主题加跟随系统，只用系统字体 | 希望简洁；Google Fonts 在国内慢 |
+| 2026-11-01 | 去掉网页编辑、文章管理页、Notion 同步 | 不再需要 |
 | 2026-11-01 | Paste 页面用原生 TS，不用 Vue | 三个页面交互简单，不值得加框架；用户内容一律 `textContent` |
 | 2026-11-01 | 二维码用 `uqr`，不用 `qrcode` | 无依赖，浏览器出 SVG，终端出半格字符 |
 | 2026-11-01 | 配对链接的 token 放在 `#t=`，不放 `?t=` | 片段不会发给服务器，不会进 Workers 日志 |
-| 2026-11-01 | 阶段 4 先不推送代码仓库 | 推送会触发旧 Pages 项目构建 `blog_by_vue`；阶段 5 先关自动构建再推送 |
+| 2026-11-01 | 阶段 4 先不推送代码仓库 | 推送会触发旧 Pages 项目的构建；阶段 5 先关自动构建再推送 |
+| 2026-11-01 | 阶段 6 不等两周观察期，切换当天完成 | 切换后验证全部通过，用户确认直接清理 |
+| 2026-11-01 | 关闭 workers.dev 地址 | 同一份内容不要有两个地址 |
 
-## 下一步
-
-阶段 6：清理（设计文档第 9 节）。切换后先观察两周，2026-11-15 前后开始。
-
-1. 关闭 DMIT 上的 `markvault-backend` 服务。删除 `apiblog` 的 DNS 记录需要用户在后台操作，原因同上。
-2. 删除 Pages 项目 `markvaultfront`。
-3. 按设计文档 7.1 末尾的清单删除旧代码和旧文档（`server_flask/`、`blog_by_vue/`、`manage.py`、`.github/workflows/deploy-backend.yml` 等；`obsidian-plugin/` 已经重写，保留），更新 `AGENTS.md`、`docs/architecture.md`、`docs/content-guide.md`、`docs/development-guide.md`、`docs/api.md`。
-4. 在 `docs/changelog.md` 里记录这次迁移。
-5. 决定是否关闭 workers.dev 地址（`workers_dev: false`），以及删掉 workers.dev 上配对过的设备。
-
-## 本地测试
-
-- 构建：`npm run markvault -- build`，输出到 `site/dist`，包含 Pagefind 索引和 `_redirects`。
-- 本地预览（开发模式）：`npm run markvault -- preview`，访问 http://localhost:4321 。vault 有改动时页面会自动刷新，`/img/*` 直接读 vault 里的原图。开发模式下没有搜索索引。
-- 测试构建产物：`zsh scripts/dev/serve-run.sh <命令>` 会在 8787 端口用 wrangler dev 托管 `site/dist`，命令执行完后关闭。配合 `node scripts/dev/cdp.mjs <url> <等待毫秒> <JS 表达式>`（headless Chrome，通过 DevTools 协议驱动）可以检查页面状态。环境变量 `WIDTH`、`HEIGHT`、`SCHEME=light|dark`、`SHOT=文件.png` 用于截图。注意：本机设置了 HTTP 代理，访问 localhost 时要加 `curl --noproxy "*"`。
-- 部署预览：`npm run markvault -- deploy`，部署到 https://markvault.wangsheng.workers.dev 。
-- Paste 本地测试：
-  - `cd site && ../node_modules/.bin/wrangler d1 migrations apply markvault --local` 建本地表（数据在 `site/.wrangler/`）。
-  - `npm run markvault -- build` 之后，在 `site/` 下运行 `../node_modules/.bin/wrangler dev --port 8787 --local --test-scheduled --var CLOUDINARY_CLOUD:<cloud_name>`。访问 `/__scheduled` 可以手动触发 Cron。
-  - `npm run markvault -- paste-invite --local` 生成本地邀请链接，然后 `node scripts/dev/paste-smoke.mjs <链接>` 跑 44 项接口检查，它只删除自己创建的数据。
-  - 对线上跑时去掉 `--local`，并加 `NODE_USE_ENV_PROXY=1`：本机 DNS 会把 workers.dev 解析到被污染的地址，Node 的 fetch 默认不走代理。
-  - 旧 paste 导入：`node scripts/import-legacy-pastes.mjs <pastes 目录> [--local]`，可以重复运行。
-
-- 类型检查：`node_modules/.bin/tsc --noEmit -p tsconfig.json`（或 `npm run typecheck`）。
-- CLI 直接用 Node 运行 TypeScript（Node ≥ 22.18 原生支持类型擦除）：`npm run markvault -- check`，默认读取 `./content`。
-- 不碰真实 vault 的测试方法：`rm -rf .tmp/vault-copy && cp -R content/ .tmp/vault-copy`，然后加 `--vault .tmp/vault-copy`。`.tmp/` 已经被 gitignore。
-- 2026-11-01 在副本上的结果：手动修正 sub2api 那篇后，`migrate --apply` 完成 15 项；`check` 显示 10 篇文章、4 个系列、9 张待上传图片。剩下 2 个错误（`logistic-regression_2` 的 slug、H264 那篇的占位图片）和 1 个警告（drawio 链接），都是第 7 项里列出的内容问题。
+本地开发和测试方法已经移到 [开发指南](development-guide.md)。
 
 ## 会话日志
 
@@ -259,7 +175,7 @@
 
 ### 2026-11-01（Claude Code，阶段 4 收尾）
 
-- 用户完成设备配对：D1 里有 `Mac · Safari`（13:30）和 `Android · Chrome`（13:32）两台设备。
+- 用户在 workers.dev 上配对了电脑和手机两台设备。
 - 检查 Strict Transformations：9 张图的 `f_webp,q_auto,c_limit,w_1600`、原图和 `/img/*.webp` 都返回 200。但伪造的转换参数（随机宽度、`e_grayscale`、`e_blur`）在 Cloudinary 上也返回 200，说明设置还没生效。
 - 用户保存设置后复测：新的伪造参数（`w_850`、`e_grayscale,w_352`）返回 401 `Transformation … is not allowed`。我们自己的 9 张图（WebP 转换、原图、`/img/*.webp`）仍然全部 200。
 - 上一轮测试在设置生效前生成了 6 个派生图（`9208fed3b117013d` 上的 `w_500`、`f_png,w_2000`、`e_blur:300`、`c_scale,w_3000`、`w_709`、`e_grayscale,w_403`）。已生成的派生图不受 Strict 限制，还能访问，但只占很少的存储，没有删除。
@@ -275,4 +191,18 @@
   - 9 张图 `/img/*.webp` 都是 200 并命中边缘缓存（`cf-cache-status: HIT`，`caches.default` 只在自定义域名上生效）。外站 Referer 403，原图 200。
   - 浏览器里旧 hash 链接 `/#/posts/…`、`/#/paste/<id>`、`/#/manage`、`/#/search?q=…` 跳到对应新地址。
   - `paste-smoke` 44 项通过，它创建的数据都已删除。
-- 没做：用户在正式域名上重新信任设备（见"待用户处理"）。
+- 没做：用户在正式域名上重新信任设备。
+
+### 2026-11-01（Claude Code，阶段 6）
+
+- 用户在正式域名上重新信任了设备，确认不等两周观察期，直接清理。
+- 线上：
+  - 停止并禁用旧服务器上的 Flask 服务。服务器上同时运行的其他服务没有动，旧代码和数据留在服务器上。
+  - 删除 Pages 项目 `markvaultfront`。
+  - `site/wrangler.jsonc` 设 `workers_dev: false` 并重新部署，workers.dev 地址返回 404，正式域名正常。
+- 代码仓库：
+  - 删除 `server_flask/`、`blog_by_vue/`、`manage.py`、`.github/workflows/deploy-backend.yml`、`docs/deploy-content-action-template.yml`、`docs/vps-setup-guide.md`、`.env.example`、`scripts/import-legacy-pastes.mjs`（旧 paste 已在阶段 4 导入）、`docs/requirements.md`（列的都是旧系统的需求）。`.gitignore` 去掉 Python 和 `server_flask/data/` 相关的规则。
+  - 按新架构重写 `AGENTS.md`、`README.md`、`README.zh-CN.md`、`docs/architecture.md`、`docs/api.md`、`docs/content-guide.md`、`docs/development-guide.md`，`docs/changelog.md` 加上这次迁移。
+  - 仓库是公开的，所以本文件删掉了服务器地址、SSH 信息、zone id、token 前缀、设备名和本机路径，"本地测试"移到开发指南。这些信息在更早的提交历史里仍然能看到。
+- 验证：类型检查（packages、site、worker）、`markvault check`、`markvault build` 通过。
+- 需要用户在后台处理：删除旧 API 子域名的 DNS 记录和 tunnel 里对应的 hostname、删除 GitHub 仓库里旧部署用的 `VPS_*` secrets、作废旧的 Notion token。
