@@ -21,7 +21,8 @@
   ],
   "vars": {
     // CLOUDINARY_CLOUD 不写在这里（代码仓库是公开的），由 markvault deploy 用 --var 传入。
-    "IMG_REFERER_ALLOW": ""
+    // 允许自己的其他子域名引用图片（例如经 EdgeOne 加速的测试域名）。
+    "IMG_REFERER_ALLOW": "liuyun.ac.cn"
   },
   // 每小时清理过期的 paste 和配对码。
   "triggers": { "crons": ["0 * * * *"] },
