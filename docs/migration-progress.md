@@ -19,14 +19,14 @@
 
 ## 当前状态
 
-**阶段 0 到 4 已完成，下一步是阶段 5（切换域名）。** 预览站点 https://markvault.wangsheng.workers.dev 上文章、图片和 Paste 都能用，D1 已建表，2 条旧 paste 已导入。阶段 4 的代码还没有推送到 GitHub：推送会触发旧 Pages 项目自动构建 `blog_by_vue`，留到阶段 5 再推。需要用户操作的事见"待用户处理"：信任第一台设备、配对手机、开启 Cloudinary Strict Transformations。
+**阶段 0 到 4 已完成，下一步是阶段 5（切换域名）。** 预览站点 https://markvault.wangsheng.workers.dev 上文章、图片和 Paste 都能用，D1 已建表，2 条旧 paste 已导入。阶段 4 的代码还没有推送到 GitHub：推送会触发旧 Pages 项目自动构建 `blog_by_vue`，留到阶段 5 再推。设备配对和 Cloudinary Strict Transformations 都已完成。
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
 | 0 | 准备：清理工作区、账号、D1、备份服务器数据 | 完成 | 代码 `dbf0deb`；vault `ee21fc2` |
 | 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
 | 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成，已部署预览 | 见 git log |
-| 3 | 无损压缩、Cloudinary 上传、`/img/*` Worker、`publish`/`unpublish`、`published.json`、Obsidian 插件 0.2、`scripts/setup.sh` | 完成（Strict Transformations 待用户开启） | 见 git log；vault `e884a74` |
+| 3 | 无损压缩、Cloudinary 上传、`/img/*` Worker、`publish`/`unpublish`、`published.json`、Obsidian 插件 0.2、`scripts/setup.sh` | 完成 | 见 git log；vault `e884a74` |
 | 4 | Paste：Worker、D1、设备信任、旧数据导入 | 完成，已部署预览（设备配对待用户操作） | 见 git log（未推送） |
 | 5 | 切换域名到 Worker | 未开始 | |
 | 6 | 清理旧代码、更新文档、下线 DMIT | 未开始 | |
@@ -45,8 +45,7 @@
 ## 待用户处理
 
 0. ~~信任第一台设备，再配对手机~~：2026-11-01 完成，线上已信任 `Mac · Safari` 和 `Android · Chrome`。切换域名后 cookie 按域名保存，要在新域名上用 `paste-invite` 和「添加设备」再做一遍。
-1. **在 Cloudinary 后台开启 Strict Transformations**（2026-11-01 用户说已开启，但实测仍未生效：直接请求 `res.cloudinary.com` 上随机的 `w_709`、`e_grayscale,w_403` 都返回 200，是现场生成的。需要用户在后台再确认）：Settings → Security → Restricted media types / Strict transformations。开启后只有上传时预先生成的 `f_webp,q_auto,c_limit,w_1600` 这一种转换能用，别人拼出别的转换参数时，不会消耗你的额度。开启后告诉 agent，agent 会验证我们自己的图片仍然能正常显示。
-   另外，如果 Obsidian 正开着，在「第三方插件」里把 MarkVault Publisher 关掉再打开，才会加载 0.2 版。
+1. ~~在 Cloudinary 后台开启 Strict Transformations~~：2026-11-01 完成并验证。
 2. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
 3. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
 4. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
@@ -258,3 +257,5 @@
 
 - 用户完成设备配对：D1 里有 `Mac · Safari`（13:30）和 `Android · Chrome`（13:32）两台设备。
 - 检查 Strict Transformations：9 张图的 `f_webp,q_auto,c_limit,w_1600`、原图和 `/img/*.webp` 都返回 200。但伪造的转换参数（随机宽度、`e_grayscale`、`e_blur`）在 Cloudinary 上也返回 200，说明设置还没生效。
+- 用户保存设置后复测：新的伪造参数（`w_850`、`e_grayscale,w_352`）返回 401 `Transformation … is not allowed`。我们自己的 9 张图（WebP 转换、原图、`/img/*.webp`）仍然全部 200。
+- 上一轮测试在设置生效前生成了 6 个派生图（`9208fed3b117013d` 上的 `w_500`、`f_png,w_2000`、`e_blur:300`、`c_scale,w_3000`、`w_709`、`e_grayscale,w_403`）。已生成的派生图不受 Strict 限制，还能访问，但只占很少的存储，没有删除。
