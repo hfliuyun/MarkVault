@@ -28,11 +28,8 @@
   },
   // 每小时清理过期的 paste 和配对码。
   "triggers": { "crons": ["0 * * * *"] },
-  // origin 是 EdgeOne 的回源域名。切换完成后 blog 由 EdgeOne 提供，这里只留 origin。不开 workers.dev。
-  "routes": [
-    { "pattern": "blog.liuyun.ac.cn", "custom_domain": true },
-    { "pattern": "origin.liuyun.ac.cn", "custom_domain": true }
-  ],
+  // 只绑回源域名：访客访问的 blog 由 EdgeOne 提供，它回源到 origin。不开 workers.dev。
+  "routes": [{ "pattern": "origin.liuyun.ac.cn", "custom_domain": true }],
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true }
