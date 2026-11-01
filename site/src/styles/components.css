@@ -6,6 +6,8 @@
   position: relative;
 }
 .site-header .wrap {
+  /* 和正文列同宽（加上左右 padding），导航和标题的左边缘就能对齐。 */
+  max-width: calc(var(--measure) + 48px);
   height: 64px;
   display: flex;
   align-items: center;
@@ -211,12 +213,22 @@
 }
 
 /* ---------- 文章页 ---------- */
+/*
+ * 正文列定义整个页面的宽度，目录排在它右边的留白里：第二列比容器宽，
+ * 所以它溢出到右侧，正文的左边缘和页头、首页保持一致。
+ */
 .post-layout {
   display: grid;
-  grid-template-columns: minmax(0, var(--measure)) 14rem;
-  gap: 64px;
-  justify-content: center;
+  grid-template-columns: var(--measure) var(--toc-width);
+  gap: var(--toc-gap);
+  align-items: start;
+  max-width: var(--measure);
+  margin: 0 auto;
   padding: 56px 0 96px;
+}
+.post-layout > article {
+  /* 正文列固定宽度，代码块自己横向滚动，不撑开网格。 */
+  min-width: 0;
 }
 .eyebrow {
   font-size: 14px;
@@ -470,6 +482,7 @@
   font-size: 13px;
 }
 .site-footer .wrap {
+  max-width: calc(var(--measure) + 48px);
   padding-top: 28px;
   padding-bottom: 40px;
   display: flex;
@@ -479,7 +492,7 @@
 }
 
 /* ---------- 窄屏 ---------- */
-@media (max-width: 1100px) {
+@media (max-width: 1299px) {
   .post-layout {
     grid-template-columns: minmax(0, var(--measure));
   }

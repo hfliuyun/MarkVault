@@ -4,7 +4,11 @@
     "Microsoft YaHei", sans-serif;
   --font-serif: "Iowan Old Style", Charter, Georgia, "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, "PingFang SC", monospace;
-  --measure: 42rem;
+  /* 正文列宽度：页头、首页列表和文章正文都用它，左边缘才对得齐。 */
+  --measure: 46rem;
+  /* 宽屏时目录占的宽度，它排在正文右边、不影响正文宽度。 */
+  --toc-width: 13rem;
+  --toc-gap: 48px;
   --radius: 8px;
   --radius-lg: 12px;
 }
