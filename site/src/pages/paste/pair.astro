@@ -1,0 +1,38 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import "../../styles/paste.css";
+---
+
+<BaseLayout title="信任这台设备" nav="paste">
+  <meta slot="head" name="robots" content="noindex" />
+  <meta slot="head" name="referrer" content="no-referrer" />
+  <div class="wrap">
+    <section class="paste measure">
+      <h1>信任这台设备？</h1>
+      <p class="lead">信任后，这台设备打开 Paste 就能直接用，一年内用过一次就会自动续期。只在你自己的设备上这样做。</p>
+
+      <div id="pair-invalid" hidden>
+        <p>这个链接不完整。请重新扫码，或者在已信任的设备上重新生成。</p>
+      </div>
+
+      <div id="pair-already" hidden>
+        <p>这台设备已经被信任了（<strong id="pair-already-name"></strong>），不需要再配对。</p>
+        <p><a class="btn btn-primary" href="/paste/">打开 Paste</a></p>
+      </div>
+
+      <form class="pair-card" id="pair-confirm" autocomplete="off" hidden>
+        <label class="field">
+          <span>设备名</span>
+          <input id="pair-name" class="input" maxlength="40" />
+        </label>
+        <p class="hint" id="pair-wechat" hidden>你在微信里打开了这个页面。信任只对微信内置浏览器有效；想在系统浏览器里用，请先点右上角「在浏览器打开」。</p>
+        <p class="form-error" id="pair-error" role="alert" hidden></p>
+        <button class="btn btn-primary" id="pair-submit" type="submit">信任这台设备</button>
+      </form>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  import "../../lib/paste/pair.ts";
+</script>

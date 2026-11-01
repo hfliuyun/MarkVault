@@ -1,0 +1,32 @@
+---
+// The Worker serves this page for every /paste/<id>; the script reads the id from the URL.
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import "../../styles/paste.css";
+---
+
+<BaseLayout title="Paste" nav="paste">
+  <meta slot="head" name="robots" content="noindex" />
+  <div class="wrap">
+    <section class="paste measure">
+      <a class="back" href="/paste/">← Paste</a>
+      <p class="lead" id="view-loading">正在加载…</p>
+      <div id="view-missing" hidden>
+        <h1>找不到这条 Paste</h1>
+        <p class="lead" id="view-missing-text">它不存在，或者已经过期。</p>
+      </div>
+      <article id="view-found" hidden>
+        <h1 id="view-title"></h1>
+        <p class="lead" id="view-meta"></p>
+        <div class="actions view-actions">
+          <button class="btn btn-primary" id="view-copy" type="button">复制全文</button>
+          <button class="btn" id="view-link" type="button">复制链接</button>
+        </div>
+        <pre class="paste-content" id="view-content"></pre>
+      </article>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  import "../../lib/paste/view.ts";
+</script>

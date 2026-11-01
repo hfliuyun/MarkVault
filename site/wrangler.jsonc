@@ -9,12 +9,22 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
     // 只有这些路径会执行 Worker 脚本，其余全部是免费的静态资源请求。
-    "run_worker_first": ["/img/*"]
+    "run_worker_first": ["/img/*", "/api/*", "/paste/*"]
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "markvault",
+      "database_id": "003333e1-03a1-4990-a3ef-08e6d6c87ee8",
+      "migrations_dir": "./worker/migrations"
+    }
+  ],
   "vars": {
     // CLOUDINARY_CLOUD 不写在这里（代码仓库是公开的），由 markvault deploy 用 --var 传入。
     "IMG_REFERER_ALLOW": ""
   },
+  // 每小时清理过期的 paste 和配对码。
+  "triggers": { "crons": ["0 * * * *"] },
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true }

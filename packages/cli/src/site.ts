@@ -36,6 +36,21 @@ export function runInSite(tool: "astro" | "pagefind" | "wrangler", args: string[
   });
 }
 
+/** Run a tool inside site/ quietly; its output is returned, or included in the error when it fails. */
+export function captureInSite(tool: "wrangler", args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(bin(tool), args, { cwd: SITE_DIR, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) resolve(output);
+      else reject(new Error(`${tool} ${args.slice(0, 2).join(" ")} 失败（${signal ?? `退出码 ${code}`}）\n${output.trim()}`));
+    });
+  });
+}
+
 export async function buildSite(env: SiteEnv): Promise<void> {
   await runInSite("astro", ["build"], env);
   await runInSite("pagefind", ["--site", "dist", "--silent"], env);

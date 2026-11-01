@@ -92,7 +92,7 @@
 
 **读图片**：HTML 里的图片地址是 `/img/<hash>.webp`。Worker 先检查 Referer，再查 CF 边缘缓存。缓存命中就直接返回；没命中就向 Cloudinary 取回，写入缓存后返回。响应头带 `Cache-Control: public, max-age=31536000, immutable`，浏览器之后不再请求同一张图。
 
-**用 Paste**：浏览器打开 `/paste`，拿到静态页面外壳，Vue 组件调用 `/api/paste/items`。Worker 校验设备 cookie 后查询 D1。
+**用 Paste**：浏览器打开 `/paste`，拿到静态页面外壳，页面脚本（原生 TS）调用 `/api/paste/items`。Worker 校验设备 cookie 后查询 D1。
 
 **旧链接**：
 
@@ -421,14 +421,14 @@ Cloudflare 的凭据由 `wrangler login` 管理，不放在这里。
 
 1. CLI 在本机生成 32 字节随机 token，计算 hash。
 2. 执行 `wrangler d1 execute markvault --remote --command "INSERT INTO pair_codes …"`，写入 token 的 hash，有效期 10 分钟。这一步要求你已经登录 Cloudflare 账号，这本身就证明了你是站点主人。所以 Worker 里不需要保存任何管理密钥。
-3. 终端打印 `https://<域名>/paste/pair?t=<token>`，同时显示二维码。
+3. 终端打印 `https://<域名>/paste/pair/#t=<token>`，同时显示二维码。
 
 **「添加设备」（已信任设备上）**
 
 - 调用 `POST /api/paste/pair-codes`，同时生成一个 6 位配对码和一个长 token，有效期 2 分钟。二维码里放的是长 token 的链接。
 - 6 位配对码最多允许输错 5 次，超过就作废。
 
-**消费 token**：`GET /paste/pair?t=…` 只返回一个确认页面（"信任这台设备？"加一个设备名输入框）。用户点按钮后才 `POST /api/paste/pair` 真正使用 token。这样做是因为聊天软件会预先抓取链接生成预览，如果 GET 就消费 token，链接会在你点开之前就失效。token 只能使用一次。
+**消费 token**：token 放在 URL 片段（`#t=…`）里，浏览器不会把片段发给服务器，所以不会出现在 Workers 日志里。`GET /paste/pair/` 只返回一个确认页面（"信任这台设备？"加一个设备名输入框）。用户点按钮后才 `POST /api/paste/pair` 真正使用 token。这样做是因为聊天软件会预先抓取链接生成预览，如果 GET 就消费 token，链接会在你点开之前就失效。token 只能使用一次。
 
 ### 6.4 接口
 
@@ -515,11 +515,11 @@ MarkVault/
 │   │   │   ├── search.astro、about.astro、404.astro
 │   │   │   └── paste/index.astro、paste/view.astro、paste/pair.astro
 │   │   ├── components/       Astro 组件：页头、文章元信息、目录、侧边栏
-│   │   ├── islands/          Vue 组件：PasteApp、PasteView、PairPage、MobileNav
+│   │   ├── lib/paste/        Paste 页面脚本（原生 TS，不用 Vue）：api、ui、home、view、pair
 │   │   └── styles/           基础排版、正文、组件样式和主题（见 8.7）
 │   └── worker/
 │       ├── index.ts          路由分发
-│       ├── img.ts、paste.ts、devices.ts、cron.ts
+│       ├── img.ts、api.ts（路由）、paste.ts、devices.ts、http.ts、cron.ts
 │       └── migrations/0001_init.sql
 ├── obsidian-plugin/          重写后的薄插件
 ├── scripts/setup.sh
@@ -736,7 +736,19 @@ site/src/styles/
 
 ### 阶段 4：Paste
 
-- 实现 Worker 接口、设备信任、配对、Cron，以及 Paste 的 Vue 组件。
+实现补充：
+- 页面脚本用原生 TS（`site/src/lib/paste/`），不用 Vue。三个页面的交互都很简单，不值得为它加一个框架；用户内容一律走 `textContent`。
+- 列表接口每页最多 20 条，只内联 5 万字符以内的内容。更长的条目在点「复制」时再取（`ClipboardItem` 接收 Promise，Safari 也不会丢掉点击授权），一页最多约 100 万字符，不会超出免费版每次 10ms 的 CPU。
+- 列表用 `before=<created_at>:<id>` 游标分页，永不过期的条目多了也能翻到。
+- 输错配对码时无法对应到某一行，所以每次尝试都给所有有效的配对码加一次 `attempts`。计数和认领放在同一个 `db.batch` 里（D1 按事务执行），并发请求不能绕过 5 次的限制。匿名请求可以用 5 次错误尝试让当前配对码作废，这个代价可以接受：链接和二维码不受影响，重新生成即可。
+- 请求体按流计数：只带 token、配对码或设备名的接口上限 4KB，创建 paste 上限 7MB。不依赖 `Content-Length`，分块上传也会被拦下。
+- 终端邀请有效期 10 分钟，「添加设备」的配对码 2 分钟。
+- Cron 另外删除一年多没用过的设备：它们的 cookie 在浏览器里已经过期，记录留着没有用。
+- 二维码用 `uqr`（无依赖，浏览器输出 SVG，终端用半格字符加固定黑白色，深色终端也能扫）。
+- 旧 paste 用 `scripts/import-legacy-pastes.mjs` 导入，长内容分段拼接（D1 单条 SQL 上限 100KB），导入后比对 sha256。
+- `scripts/dev/paste-smoke.mjs` 是接口的端到端检查，只删除自己创建的数据，切换域名后可以对线上再跑一次。
+
+- 实现 Worker 接口、设备信任、配对、Cron，以及 Paste 页面。
 - 写一个一次性脚本，把备份的 `data/pastes/*.json` 导入 D1，跳过已过期的。
 - 用 `markvault paste-invite` 信任第一台设备，然后在手机上走一遍配对流程。
 

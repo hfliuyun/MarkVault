@@ -1,13 +1,109 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import "../../styles/paste.css";
+
+const languages = [
+  ["text", "纯文本"],
+  ["bash", "bash"],
+  ["python", "python"],
+  ["javascript", "javascript"],
+  ["typescript", "typescript"],
+  ["json", "json"],
+  ["yaml", "yaml"],
+  ["markdown", "markdown"],
+  ["html", "html"],
+  ["css", "css"],
+  ["sql", "sql"],
+];
+const expiries = [
+  ["1h", "1 小时后过期"],
+  ["1d", "1 天后过期"],
+  ["1w", "1 周后过期"],
+  ["never", "永不过期"],
+];
 ---
 
-<!-- 阶段 4 实现：设备信任、最近列表、一键复制（设计文档第 6 节）。 -->
 <BaseLayout title="Paste" nav="paste">
+  <meta slot="head" name="robots" content="noindex" />
   <div class="wrap">
-    <section class="page-head measure">
-      <h1>Paste</h1>
-      <p>在自己的设备之间传文本和代码片段。即将上线。</p>
+    <section class="paste measure">
+      <div class="paste-head">
+        <div>
+          <h1>Paste</h1>
+          <p class="lead" id="paste-lead">正在检查这台设备…</p>
+        </div>
+      </div>
+      <p class="paste-status" id="paste-status" role="alert" hidden></p>
+
+      <!-- 未信任：输入配对码 -->
+      <div id="paste-untrusted" hidden>
+        <form class="pair-card" id="pair-form" autocomplete="off">
+          <p>在一台已信任的设备上打开 Paste，点「添加设备」，然后输入屏幕上的 6 位配对码，或者直接扫码。</p>
+          <label class="field">
+            <span>配对码</span>
+            <input id="pair-code" class="input code-input" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" placeholder="000 000" required />
+          </label>
+          <label class="field">
+            <span>设备名</span>
+            <input id="pair-name" class="input" maxlength="40" />
+          </label>
+          <p class="form-error" id="pair-error" role="alert" hidden></p>
+          <button class="btn btn-primary" id="pair-submit" type="submit">信任这台设备</button>
+          <p class="hint">还没有任何已信任的设备？在发布用的电脑上运行 <code>npm run markvault -- paste-invite</code>。</p>
+        </form>
+      </div>
+
+      <!-- 已信任 -->
+      <div id="paste-trusted" hidden>
+        <form class="composer" id="composer">
+          <label class="visually-hidden" for="composer-title">标题</label>
+          <input id="composer-title" class="composer-title" maxlength="200" placeholder="标题（可选）" autocomplete="off" />
+          <label class="visually-hidden" for="composer-content">内容</label>
+          <textarea id="composer-content" placeholder="粘贴文本或代码，⌘↵ 保存" spellcheck="false"></textarea>
+          <div class="composer-bar">
+            <select id="composer-language" aria-label="语言">
+              {languages.map(([value, label]) => <option value={value}>{label}</option>)}
+            </select>
+            <select id="composer-expiry" aria-label="过期时间">
+              {expiries.map(([value, label]) => <option value={value} selected={value === "1d"}>{label}</option>)}
+            </select>
+            <button class="btn btn-primary" id="composer-save" type="submit">保存</button>
+          </div>
+        </form>
+        <p class="form-error" id="composer-error" role="alert" hidden></p>
+
+        <ul class="paste-list" id="paste-list"></ul>
+        <p class="empty" id="paste-empty" hidden>还没有内容。</p>
+        <div class="paste-more"><button class="btn" id="paste-more" type="button" hidden>加载更多</button></div>
+
+        <section class="paste-section">
+          <div class="section-head">
+            <h2>添加设备</h2>
+            <button class="btn" id="invite-open" type="button">生成配对码</button>
+          </div>
+          <div class="invite" id="invite" hidden>
+            <div class="qr" id="invite-qr"></div>
+            <div class="invite-body">
+              <p>用新设备扫码，或者在新设备上打开 <strong id="invite-origin"></strong> 输入配对码：</p>
+              <p class="pair-code" id="invite-code"></p>
+              <p class="info"><span id="invite-timer"></span> · 只能用一次</p>
+              <div class="actions">
+                <button class="btn" id="invite-renew" type="button">重新生成</button>
+                <button class="btn" id="invite-close" type="button">完成</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <details class="paste-section" id="devices-panel">
+          <summary><h2>已信任的设备</h2></summary>
+          <ul class="device-list" id="devices"></ul>
+        </details>
+      </div>
     </section>
   </div>
 </BaseLayout>
+
+<script>
+  import "../../lib/paste/home.ts";
+</script>

@@ -10,11 +10,12 @@ import {
   writePublished,
   type Diagnostic,
 } from "@markvault/content";
-import { readConfig, resolveVaultPath, type CliConfig } from "./config.ts";
+import { CONFIG_PATH, readConfig, resolveVaultPath, type CliConfig } from "./config.ts";
 import { commitVault } from "./git.ts";
 import { requireCredentials } from "./images/cloudinary.ts";
 import { syncImages, writeManifestPaths } from "./images/upload.ts";
 import { prepareNote, setPublishFlag } from "./note.ts";
+import { createInvite, terminalQr } from "./paste.ts";
 import { buildSite, runInSite } from "./site.ts";
 
 const USAGE = `用法：markvault <命令> [选项]
@@ -26,6 +27,7 @@ const USAGE = `用法：markvault <命令> [选项]
   preview             本地预览（astro dev），vault 改动后页面自动刷新
   build               校验后构建站点到 site/dist（含搜索索引）
   deploy              只构建和部署（代码改动用；不上传图片、不提交 vault）
+  paste-invite        生成 Paste 一次性信任链接和二维码，10 分钟内有效（第一台设备用）
   migrate             把旧格式内容转换为新格式（默认只预览，加 --apply 才会修改）
 
 选项：
@@ -33,6 +35,7 @@ const USAGE = `用法：markvault <命令> [选项]
   --slug <slug>       publish 一篇还没有 slug 的笔记时指定 slug
   --no-git            publish 时不提交、不推送 vault
   --apply             migrate 时真正写入
+  --local             paste-invite 写入本地 wrangler dev 的数据库，链接指向 localhost:8787
   -h, --help          显示帮助
 `;
 
@@ -45,6 +48,7 @@ async function main(argv: string[]): Promise<number> {
       apply: { type: "boolean", default: false },
       slug: { type: "string" },
       "no-git": { type: "boolean", default: false },
+      local: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -55,6 +59,9 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const config = await readConfig();
+  // Paste does not need the vault, so this runs before the vault check.
+  if (command === "paste-invite") return runPasteInvite(config, values.local);
+
   const vault = resolveVaultPath(values.vault, config);
   if (!(await isDirectory(vault))) {
     process.stderr.write(`vault 目录不存在：${vault}\n`);
@@ -194,6 +201,22 @@ async function runPublish(
     for (const post of added) process.stdout.write(`  新文章：${post.title}  ${base}${postUrl(post.slug)}\n`);
     for (const slug of removed) process.stdout.write(`  已下线：${slug}\n`);
   }
+  return 0;
+}
+
+async function runPasteInvite(config: CliConfig, local: boolean): Promise<number> {
+  const siteUrl = local ? "http://localhost:8787" : config.site_url;
+  if (!siteUrl) {
+    process.stderr.write(`还没有配置站点地址。在 ${CONFIG_PATH} 里加上 "site_url"，例如 "https://markvault.wangsheng.workers.dev"。\n`);
+    return 1;
+  }
+  const invite = await createInvite(siteUrl, local);
+  const until = new Date(invite.expiresAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  if (process.stdout.isTTY) process.stdout.write(`\n${terminalQr(invite.link)}\n`);
+  process.stdout.write(
+    `\n在要信任的设备上扫码，或者打开这个链接（${until} 前有效，只能用一次）：\n\n  ${invite.link}\n\n` +
+      "打开后要点「信任这台设备」才会生效，所以聊天软件预览链接不会把它用掉。\n",
+  );
   return 0;
 }
 

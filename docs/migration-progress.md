@@ -19,7 +19,7 @@
 
 ## 当前状态
 
-**阶段 0 到 3 已完成，下一步是阶段 4（Paste）。** 预览站点 https://markvault.wangsheng.workers.dev 上文章和图片都能正常显示。`markvault publish` 和新版 Obsidian 插件可以用了。只剩一件事要用户操作：在 Cloudinary 后台开启 Strict Transformations（见"待用户处理"）。
+**阶段 0 到 4 已完成，下一步是阶段 5（切换域名）。** 预览站点 https://markvault.wangsheng.workers.dev 上文章、图片和 Paste 都能用，D1 已建表，2 条旧 paste 已导入。阶段 4 的代码还没有推送到 GitHub：推送会触发旧 Pages 项目自动构建 `blog_by_vue`，留到阶段 5 再推。需要用户操作的事见"待用户处理"：信任第一台设备、配对手机、开启 Cloudinary Strict Transformations。
 
 | 阶段 | 内容 | 状态 | 提交 |
 |---|---|---|---|
@@ -27,7 +27,7 @@
 | 1 | 内容层、`markvault check`、`markvault migrate`，vault 迁移 | 完成 | 代码 `277c870`；vault `c42e47e`、`adfca5e` |
 | 2 | 渲染管线、Astro 站点、主题、搜索、hash 跳转、`_redirects`、`preview`/`build`/`deploy` 命令 | 完成，已部署预览 | 见 git log |
 | 3 | 无损压缩、Cloudinary 上传、`/img/*` Worker、`publish`/`unpublish`、`published.json`、Obsidian 插件 0.2、`scripts/setup.sh` | 完成（Strict Transformations 待用户开启） | 见 git log；vault `e884a74` |
-| 4 | Paste：Worker、D1、设备信任、旧数据导入 | 未开始 | |
+| 4 | Paste：Worker、D1、设备信任、旧数据导入 | 完成，已部署预览（设备配对待用户操作） | 见 git log（未推送） |
 | 5 | 切换域名到 Worker | 未开始 | |
 | 6 | 清理旧代码、更新文档、下线 DMIT | 未开始 | |
 
@@ -38,17 +38,18 @@
 | 代码仓库：删除临时脚本和工具缓存，补充 `.gitignore` | 完成（`dbf0deb`） |
 | 代码仓库：提交设计文档、主题原型、本文件 | 完成（`763db12`） |
 | vault：`.gitignore`、停止跟踪图片、提交迁移前快照，推送到 `origin` | 完成（`ee21fc2`） |
-| D1：`markvault`，区域 APAC，`database_id` = `003333e1-03a1-4990-a3ef-08e6d6c87ee8` | 完成（还没有建表） |
+| D1：`markvault`，区域 APAC，`database_id` = `003333e1-03a1-4990-a3ef-08e6d6c87ee8` | 完成（阶段 4 建表，迁移 `0001_init.sql`） |
 | 备份 DMIT 的内容目录和 `server_flask/data/`，与 vault 做 diff | 完成（见"环境事实"） |
 | Cloudinary：账号已注册，凭据已由用户填进 `~/.config/markvault/config.json` | 完成；Strict Transformations 在阶段 3 开启 |
 
 ## 待用户处理
 
-0. **在 Cloudinary 后台开启 Strict Transformations**：Settings → Security → Restricted media types / Strict transformations。开启后只有上传时预先生成的 `f_webp,q_auto,c_limit,w_1600` 这一种转换能用，别人拼出别的转换参数时，不会消耗你的额度。开启后告诉 agent，agent 会验证我们自己的图片仍然能正常显示。
+0. **信任第一台设备，再配对手机**：在本机运行 `npm run markvault -- paste-invite`，用电脑浏览器打开它打印的链接，点「信任这台设备」（链接 10 分钟内有效，只能用一次）。然后在 https://markvault.wangsheng.workers.dev/paste/ 点「添加设备」，用手机扫二维码，或在手机上输入 6 位配对码。切换域名后 cookie 是按域名存的，需要在新域名上再做一遍。
+1. **在 Cloudinary 后台开启 Strict Transformations**：Settings → Security → Restricted media types / Strict transformations。开启后只有上传时预先生成的 `f_webp,q_auto,c_limit,w_1600` 这一种转换能用，别人拼出别的转换参数时，不会消耗你的额度。开启后告诉 agent，agent 会验证我们自己的图片仍然能正常显示。
    另外，如果 Obsidian 正开着，在「第三方插件」里把 MarkVault Publisher 关掉再打开，才会加载 0.2 版。
-1. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
-2. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
-3. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
+2. **作废 Notion token**（前缀 `ntn_5703`，明文在 DMIT 的 `markvault-backend.service` 里）。用户说稍后处理。Cloudflare token 用户已经全部删除，所以旧站的"清理 CF 缓存"功能现在会失败，这不影响旧站正常运行。
+3. **在 Cloudflare 切换之前，不要打开 Syncthing 和 DMIT 之间的同步。** 服务器上的内容目录是 Syncthing 文件夹，但目前两边都没在运行 Syncthing。迁移后 vault 里已经没有 `index.md`，一旦同步过去，旧的 Flask 站点会一篇文章都找不到。
+4. 可选：本地分支 `feat/notion-sync-v2` 和 `feat/notion-sync-v2-implementation` 已合并进 main，可以用 `git branch -d` 删除。
 
 ## 环境事实
 
@@ -86,23 +87,19 @@
 | 2026-11-01 | 前端改用 Astro，博客和 Paste 都不用 Element Plus | 静态 HTML 最快；见设计文档第 7、8 节 |
 | 2026-11-01 | 视觉按原型：纸 / 夜 / 素三套主题加跟随系统，只用系统字体 | 用户希望简洁；Google Fonts 在国内慢 |
 | 2026-11-01 | 去掉网页编辑、文章管理页、Notion 同步 | 用户确认不再需要 |
+| 2026-11-01 | Paste 页面用原生 TS，不用 Vue | 三个页面交互简单，不值得加框架；用户内容一律 `textContent` |
+| 2026-11-01 | 二维码用 `uqr`，不用 `qrcode` | 无依赖，浏览器出 SVG，终端出半格字符 |
+| 2026-11-01 | 配对链接的 token 放在 `#t=`，不放 `?t=` | 片段不会发给服务器，不会进 Workers 日志 |
+| 2026-11-01 | 阶段 4 先不推送代码仓库 | 推送会触发旧 Pages 项目构建 `blog_by_vue`；阶段 5 切换时一起处理 |
 
 ## 下一步
 
-阶段 4：Paste（设计文档第 6 节）。
+阶段 5：切换域名（设计文档第 9 节）。
 
-1. D1 建表：`site/worker/migrations/0001_init.sql`，用 `wrangler d1 migrations apply markvault --remote` 执行。数据库 id 见"阶段 0 明细"。
-2. Worker：
-   - `/api/paste/*` 下的全部接口（设计文档 6.4）
-   - 设备 cookie 和自动续期
-   - 配对码，最多试 5 次
-   - CSRF 检查：要求 JSON 请求，并校验 Origin
-   - Cron 每小时清理过期数据
-   - `/paste/<id>` 返回查看页的外壳
-   - `wrangler.jsonc` 加上 D1 绑定、`triggers.crons`，`run_worker_first` 加上 `/api/*` 和 `/paste/*`
-3. `markvault paste-invite`：在本机生成 token，通过 `wrangler d1 execute --remote` 写入它的 hash，然后打印链接和二维码（二维码用 npm 包 `qrcode`，在终端里显示）。
-4. 页面：`paste/index.astro`（输入框和最近列表，未信任时显示配对码输入框）、`paste/view.astro`、`paste/pair.astro`（确认页，POST 后才真正使用 token）。用原生 TS 写，不用 Vue。
-5. 导入旧 paste：`.tmp/server-backup/MarkVault/server_flask/data/pastes/*.json` 里的 2 条，都是永不过期。
+1. 推送代码仓库之前，先在 Pages 项目里停用 Git 自动构建，或者确认那次构建失败不会影响线上旧站。
+2. 在 Pages 项目里解绑自定义域名，绑定到 Worker `markvault`，中间会有几分钟不可访问。
+3. 按设计文档 7.2 的 URL 对应表逐条验证旧链接，检查文章、图片、搜索、Paste。Paste 用 `paste-invite` 生成新域名的链接，再跑一次 `scripts/dev/paste-smoke.mjs`。
+4. 把 `~/.config/markvault/config.json` 里的 `site_url` 改成正式域名（`paste-invite` 和 `publish` 打印的链接用它）。`/img/*` 的防盗链按请求自己的域名放行，不用改。
 
 ## 本地测试
 
@@ -110,6 +107,12 @@
 - 本地预览（开发模式）：`npm run markvault -- preview`，访问 http://localhost:4321 。vault 有改动时页面会自动刷新，`/img/*` 直接读 vault 里的原图。开发模式下没有搜索索引。
 - 测试构建产物：`zsh scripts/dev/serve-run.sh <命令>` 会在 8787 端口用 wrangler dev 托管 `site/dist`，命令执行完后关闭。配合 `node scripts/dev/cdp.mjs <url> <等待毫秒> <JS 表达式>`（headless Chrome，通过 DevTools 协议驱动）可以检查页面状态。环境变量 `WIDTH`、`HEIGHT`、`SCHEME=light|dark`、`SHOT=文件.png` 用于截图。注意：本机设置了 HTTP 代理，访问 localhost 时要加 `curl --noproxy "*"`。
 - 部署预览：`npm run markvault -- deploy`，部署到 https://markvault.wangsheng.workers.dev 。
+- Paste 本地测试：
+  - `cd site && ../node_modules/.bin/wrangler d1 migrations apply markvault --local` 建本地表（数据在 `site/.wrangler/`）。
+  - `npm run markvault -- build` 之后，在 `site/` 下运行 `../node_modules/.bin/wrangler dev --port 8787 --local --test-scheduled --var CLOUDINARY_CLOUD:<cloud_name>`。访问 `/__scheduled` 可以手动触发 Cron。
+  - `npm run markvault -- paste-invite --local` 生成本地邀请链接，然后 `node scripts/dev/paste-smoke.mjs <链接>` 跑 44 项接口检查，它只删除自己创建的数据。
+  - 对线上跑时去掉 `--local`，并加 `NODE_USE_ENV_PROXY=1`：本机 DNS 会把 workers.dev 解析到被污染的地址，Node 的 fetch 默认不走代理。
+  - 旧 paste 导入：`node scripts/import-legacy-pastes.mjs <pastes 目录> [--local]`，可以重复运行。
 
 - 类型检查：`node_modules/.bin/tsc --noEmit -p tsconfig.json`（或 `npm run typecheck`）。
 - CLI 直接用 Node 运行 TypeScript（Node ≥ 22.18 原生支持类型擦除）：`npm run markvault -- check`，默认读取 `./content`。
@@ -219,3 +222,34 @@
 - Obsidian 插件 0.2：已重写，构建产物也复制到了 vault 的插件目录。`data.json` 换成了新设置，旧的明文设备令牌随之删除。
 - `scripts/setup.sh`：在本机完整跑过一遍，所有步骤都识别为"已配置"并跳过，最后的 check 通过。
 - 没做：验证 Strict Transformations 的效果（等用户在后台开启）；gifsicle 没装，所以 GIF 压缩没测。
+
+### 2026-11-01（Claude Code，阶段 4）
+
+- 从 Kiro 会话 `sess_fe2cbc06-…` 接手。
+- D1 迁移 `site/worker/migrations/0001_init.sql`：`devices`、`pastes`（`device_id` 外键，删除设备时置空）、`pair_codes`。
+- Worker，在 `site/worker/` 下：
+  - `http.ts`：cookie、Origin 校验、按流限制大小的 JSON 读取、随机 token / id / 配对码、sha256。
+  - `devices.ts`：会话和每 24 小时续期、配对码、配对、设备列表 / 改名 / 移除。
+  - `paste.ts`：列表（游标分页，只内联 5 万字符以内）、创建（1MB）、公开读取、删除。
+  - `api.ts`：路由表，分公开 / 会话 / 已信任三种权限，未知路径 404，方法不对 405。
+  - `cron.ts`：每小时清理。
+  - `index.ts`：`/paste/<id>` 返回查看页外壳并带 `X-Robots-Tag: noindex`。
+- CLI：`markvault paste-invite [--local]` 在本机生成 token，通过 `wrangler d1 execute` 写入 hash，在终端打印链接和二维码。`scripts/setup.sh` 增加站点地址一步。
+- 页面：`site/src/pages/paste/` 下的 `index`、`view`、`pair`，脚本在 `site/src/lib/paste/`，样式 `site/src/styles/paste.css`，三套主题都适配。
+- 安全复核（只读 subagent）没有发现高危问题。按它的意见修了这些：
+  - 配对码 5 次限制的并发竞争：改成在一个 batch 里先计数再认领。
+  - `expires_in` 接受 `__proto__`、`toString` 这类继承属性：改用 `Object.hasOwn`。
+  - 请求体大小只看 `Content-Length`：改成按流计数，配对接口上限 4KB。
+  - 配对 token 放在查询参数里会进 Workers 日志：改成放在 `#t=`。
+  - 列表一页最多 50 条、每条内联 10 万字符：改成 20 条、5 万字符。
+  - 导入脚本没有校验时间戳。
+  - 创建接口返回的 `size` 按 UTF-16 计：改成和列表一样按字符计。
+- 验证：
+  - tsc 通过（根目录、site、worker），构建 47 个页面。
+  - 本地：`paste-smoke` 44 项通过。另外用一次性脚本测了：续期、Cron 之前已过期的条目、外键置空、大条目不内联、Cron 删除；修复后的 200 个并发错误猜测、继承属性、无 `Content-Length` 的 8MB 请求，以及 emoji 的 `size`。
+  - headless Chrome 测试 24 项通过；浅色、深色、390px 手机宽度都截图看过。
+  - 线上：D1 迁移完成，2 条旧 paste 导入后 sha256 一致，已部署（版本 `777cd9b7`，Cron `0 * * * *`）。`paste-smoke` 对 workers.dev 44 项通过，它自己创建的设备和 paste 都已删除。
+- 没做：
+  - 用户自己的设备配对（见"待用户处理"）。
+  - 推送代码仓库（见决策记录）。
+  - 手机上的真机测试。

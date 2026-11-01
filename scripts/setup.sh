@@ -4,7 +4,7 @@
 #   bash scripts/setup.sh
 #
 # 做的事：检查 Node → 安装依赖 → 选择 vault → 登录 Cloudflare → 填写 Cloudinary
-# 凭据 → 检查可选的图片压缩工具 → 运行 markvault check。
+# 凭据和站点地址 → 检查可选的图片压缩工具 → 运行 markvault check。
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -80,6 +80,15 @@ else
   read -r -s -p "  api_secret（输入时不显示）：" SECRET; echo
   config_set cloudinary.api_secret "$SECRET"
   ok "已写入 ${CONFIG_FILE}（权限 600）"
+fi
+
+# 5b. 站点地址（paste-invite 生成链接、publish 打印文章链接时用）------------------
+say "站点地址"
+if [ -n "$(config_get site_url)" ]; then
+  ok "已配置：$(config_get site_url)"
+else
+  config_set site_url "$(ask "站点地址" "https://markvault.wangsheng.workers.dev")"
+  ok "site_url：$(config_get site_url)"
 fi
 
 # 6. 可选工具 ----------------------------------------------------------------

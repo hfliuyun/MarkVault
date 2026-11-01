@@ -4,5 +4,6 @@
     "allowImportingTsExtensions": true
   },
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"]
+  // worker/ has its own tsconfig with the Workers runtime types.
+  "exclude": ["dist", "worker"]
 }
