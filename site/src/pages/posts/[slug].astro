@@ -109,12 +109,29 @@ const toc = rendered.toc;
     .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
     .filter((item): item is HTMLElement => Boolean(item));
   if (targets.length > 0) {
+    const toc = document.querySelector<HTMLElement>("aside.toc");
+    let activeId = "";
+    // 目录比视口高时自己滚动，让高亮的那一项始终留在可见区域里。
+    const reveal = (link: HTMLAnchorElement) => {
+      if (!toc || toc.scrollHeight <= toc.clientHeight) return;
+      const pad = 24;
+      const top = link.offsetTop - toc.scrollTop;
+      const bottom = top + link.offsetHeight;
+      if (top < pad) toc.scrollTop = link.offsetTop - pad;
+      else if (bottom > toc.clientHeight - pad) toc.scrollTop = link.offsetTop + link.offsetHeight - toc.clientHeight + pad;
+    };
     const update = () => {
       let current = targets[0];
       for (const target of targets) {
         if (target.getBoundingClientRect().top <= 96) current = target;
       }
-      links.forEach((link) => link.classList.toggle("active", decodeURIComponent(link.hash.slice(1)) === current.id));
+      if (current.id === activeId) return;
+      activeId = current.id;
+      for (const link of links) {
+        const on = decodeURIComponent(link.hash.slice(1)) === current.id;
+        link.classList.toggle("active", on);
+        if (on) reveal(link);
+      }
     };
     document.addEventListener("scroll", update, { passive: true });
     update();
