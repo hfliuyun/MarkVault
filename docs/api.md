@@ -13,6 +13,7 @@
 | `GET /img/raw/<hash>.<ext>` | 原图（压缩后），用于 `![[图片|raw]]` |
 
 - Referer 的域名既不是当前 Host、也不是 `SITE_ORIGIN` 的域名、也不在 `IMG_REFERER_ALLOW`（逗号分隔的域名，含子域名）里时返回 403。没有 Referer 时放行。
+- 站点前面有 CDN 时，命中 CDN 缓存的响应不会再经过 Worker，所以防盗链只在缓存未命中时生效。403 不会被 CDN 缓存（实测 EdgeOne）。
 - 响应带 `Cache-Control: public, max-age=31536000, immutable`，并写入边缘缓存。上游失败的响应不缓存。
 - 不符合上面格式的路径返回 404。
 

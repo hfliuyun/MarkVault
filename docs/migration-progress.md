@@ -219,4 +219,16 @@ MarkVault 从 Flask + Vue + VPS 迁移到 Cloudflare Workers 的过程记录。�
   - 新增 `packages/cli/src/edgeone.ts`：腾讯云 TC3-HMAC-SHA256 签名，调用 `CreatePurgeTask`（`purge_host`）。签名用官方文档的示例核对过，结果一致。`deploy` 和 `publish` 部署后等 10 秒再清缓存，避免 CDN 把旧页面回填进去。
   - `setup.sh` 加了可选的 EdgeOne 配置步骤（zone_id、SecretId、SecretKey）。
 - 验证：`origin.<域名>` 和 `blog.<域名>` 的首页、文章页、`session` 都是 200；图片 Referer 是本域名时 200、外站 403；配对接口 `Origin` 是访客地址时 400（配对码错误，说明已经进了业务层）、外站 403。`blog` 行为不变。
-- 待做：在 EdgeOne 添加 `blog.<域名>` 加速域名、切换 DNS、配置子账号密钥。
+-- 切换：
+  - 用户在 EdgeOne 添加 `blog.<域名>` 加速域名（回源 `origin.<域名>`），把缓存规则的 HOST 条件改成 `blog`。
+  - 解绑 `blog` 时 Cloudflare 把它那条 DNS 记录一起删了，`blog` 返回 530（提交 `3fe3ab7`，版本 `e5638413`）。用户在 Cloudflare 加了 CNAME `blog` → EdgeOne 的接入地址，代理关闭。
+  - 从解绑到 DNS 生效之间站点不可用。
+- 切换后验证（都经 EdgeOne）：
+  - 首页、文章、系列、分类、标签、搜索、关于、Paste 页面 200；`/series` 307 补尾斜杠；不存在的文章 404；旧 slug 308 跳转；`/api/posts` 404 JSON。
+  - 没有第 2 页文章，所以 `/page/2/` 正常返回 404。
+  - 缓存：HTML 第二次请求 `HIT`，`/_astro/*` 和 `/img/*` `HIT` 且带 `max-age=2592000`，`/api/paste/session` 是 `no-store`。
+  - Paste：`session` 200，未信任设备访问 `items` 和 `pair-codes` 是 401；`pair` 的 Origin 是本站时 400（配对码错误）、外站 403。
+  - 用 D1 里临时插入的测试设备验证写操作：`session` 返回 `trusted: true` 并下发续期 cookie（`Set-Cookie` 能穿过 EdgeOne），`POST items` 201，`DELETE` 200。测试数据已删除，设备表恢复成用户的两台。
+  - 证书：`blog` 现在的证书由 EdgeOne 提供，`curl` 校验通过。
+- 已知限制：EdgeOne 按 URL 缓存，不看 Referer。图片命中缓存后不再经过 Worker，防盗链只在未命中时生效。403 不会被缓存，所以不会出现"外站把本站图片缓存成 403"的问题。
+- 待做：用户想清楚要不要配子账号密钥来自动清缓存；测试域名 `edge.<域名>` 用完可以删掉。
