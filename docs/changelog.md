@@ -2,6 +2,12 @@
 
 本文档记录已完成的功能和实现历史，用于追溯和参考。
 
+## EdgeOne 加速（2026-11）
+
+- 站点前面加一层 EdgeOne（国际版，没有备案，用不含中国大陆的节点）。Worker 改由回源域名 `origin.<域名>` 提供服务，访客仍访问 `blog.<域名>`。
+- Worker 新增 `SITE_ORIGIN` 配置：Paste 的 Origin 校验和图片的 Referer 校验在比对本机 Host 之外也认这个公开地址，这样经过 CDN 时写操作和图片不会被误判。
+- `markvault deploy` 和 `publish` 在配置了 `edgeone` 时，部署后自动调用腾讯云 `CreatePurgeTask` 清除 EdgeOne 缓存（TC3-HMAC-SHA256 签名）。没配置就跳过，失败只警告。
+
 ## 迁移到 Cloudflare Workers（2026-11）
 
 设计见 [Cloudflare 迁移设计](specs/2026-11-01-cloudflare-migration-design.md)，过程见 [迁移记录](migration-progress.md)。

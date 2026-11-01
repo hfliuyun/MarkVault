@@ -47,10 +47,25 @@ export function clearDeviceCookie(): string {
  * CSRF (design doc 6.2): every write must come from our own pages. Browsers
  * always send Origin on POST/PATCH/DELETE; a JSON body forces a CORS preflight
  * for cross-site fetches, which we never answer.
+ *
+ * Behind a CDN the Worker sees the origin hostname, not the one in the
+ * browser, so the public address (SITE_ORIGIN) is accepted as well.
  */
-export function assertSameOrigin(request: Request): void {
+export function assertSameOrigin(request: Request, siteOrigin?: string): void {
   const origin = request.headers.get("Origin");
-  if (!origin || origin !== new URL(request.url).origin) throw new HttpError(403, "来源不正确");
+  if (!origin) throw new HttpError(403, "来源不正确");
+  if (origin === new URL(request.url).origin || origin === normalizeOrigin(siteOrigin)) return;
+  throw new HttpError(403, "来源不正确");
+}
+
+/** "https://example.com/" → "https://example.com"; undefined for empty or invalid values. */
+export function normalizeOrigin(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Upper bound for a paste body: 1MB of content can grow up to ~6x when JSON-escaped. */

@@ -4,7 +4,7 @@
 #   bash scripts/setup.sh
 #
 # 做的事：检查 Node → 安装依赖 → 选择 vault → 登录 Cloudflare → 填写 Cloudinary
-# 凭据和站点地址 → 检查可选的图片压缩工具 → 运行 markvault check。
+# 凭据和站点地址 →（可选）EdgeOne 缓存清除 → 检查可选的图片压缩工具 → 运行 markvault check。
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -89,6 +89,23 @@ if [ -n "$(config_get site_url)" ]; then
 else
   config_set site_url "$(ask "站点地址" "https://blog.liuyun.ac.cn")"
   ok "site_url：$(config_get site_url)"
+fi
+
+# 5c. EdgeOne（可选：站点前面有 EdgeOne 时，部署后自动清除它的缓存）------------
+say "EdgeOne 缓存清除（可选，直接回车跳过）"
+if [ -n "$(config_get edgeone.zone_id)" ] && [ -n "$(config_get edgeone.secret_id)" ] && [ -n "$(config_get edgeone.secret_key)" ]; then
+  ok "已配置（zone：$(config_get edgeone.zone_id)）"
+else
+  ZONE="$(ask "zone_id（EdgeOne 站点 id，留空跳过）")"
+  if [ -n "$ZONE" ]; then
+    config_set edgeone.zone_id "$ZONE"
+    config_set edgeone.secret_id "$(ask "SecretId（建议用只有 EdgeOne 清除缓存权限的子用户）")"
+    read -r -s -p "  SecretKey（输入时不显示）：" SECRET; echo
+    config_set edgeone.secret_key "$SECRET"
+    ok "已写入 ${CONFIG_FILE}（权限 600）"
+  else
+    ok "跳过"
+  fi
 fi
 
 # 6. 可选工具 ----------------------------------------------------------------

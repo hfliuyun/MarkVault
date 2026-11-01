@@ -15,6 +15,8 @@ import { createPaste, deletePaste, getPaste, listPastes } from "./paste.ts";
 
 export interface ApiEnv {
   DB: D1Database;
+  /** Public address of the site, e.g. https://blog.example.com (see http.ts assertSameOrigin). */
+  SITE_ORIGIN?: string;
 }
 
 interface Context {
@@ -73,7 +75,7 @@ export async function handleApi(request: Request, env: ApiEnv): Promise<Response
   }
 
   try {
-    if (request.method !== "GET") assertSameOrigin(request);
+    if (request.method !== "GET") assertSameOrigin(request, env.SITE_ORIGIN);
     const session: Session = route.access === "public" ? { device: null } : await getSession(request, env.DB);
     if (route.access === "trusted" && !session.device) {
       const response = errorResponse(401, "这台设备还没有被信任");

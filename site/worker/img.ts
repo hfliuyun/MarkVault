@@ -1,4 +1,5 @@
 import { cloudinaryDeliveryUrl, PASSTHROUGH_FORMATS } from "../../packages/content/src/delivery.ts";
+import { normalizeOrigin } from "./http.ts";
 
 /**
  * GET /img/<hash>.<ext> and /img/raw/<hash>.<ext> (design doc 4.5).
@@ -10,6 +11,8 @@ export interface ImageEnv {
   CLOUDINARY_CLOUD: string;
   /** Extra hostnames allowed to embed images, comma separated. */
   IMG_REFERER_ALLOW?: string;
+  /** Public address of the site; its pages may embed images even when the Worker is reached under another hostname. */
+  SITE_ORIGIN?: string;
 }
 
 const PATH = /^\/img\/(raw\/)?([0-9a-f]{16})\.([a-z0-9]{2,5})$/;
@@ -25,8 +28,9 @@ function refererAllowed(request: Request, env: ImageEnv): boolean {
   } catch {
     return false;
   }
-  const own = new URL(request.url).hostname;
-  if (host === own) return true;
+  if (host === new URL(request.url).hostname) return true;
+  const site = normalizeOrigin(env.SITE_ORIGIN);
+  if (site && host === new URL(site).hostname) return true;
   const extra = (env.IMG_REFERER_ALLOW ?? "")
     .split(",")
     .map((item) => item.trim().toLowerCase())

@@ -14,7 +14,7 @@ MarkVault 是一个 Markdown 优先的个人博客。文章写在 Obsidian vault
   - `src/lib/vault.ts`：读取 vault 并缓存渲染结果。`src/lib/paste/`：Paste 页面脚本（原生 TS）。
   - `integrations/markvault.ts`：开发时监听 vault，构建后写 `_redirects`。
   - `worker/`：`/img/*` 图片转发、`/api/paste/*` 接口、`/paste/<id>` 外壳页、每小时的 Cron。D1 迁移在 `worker/migrations/`。
-  - `wrangler.jsonc`：Worker 配置，正式域名写在 `routes` 里。
+  - `wrangler.jsonc`：Worker 配置。访客域名和 CDN 回源域名写在 `routes` 里，`vars.SITE_ORIGIN` 是访客看到的地址，要和访客域名一致。
 - `obsidian-plugin/`：薄插件，只调用 `markvault publish / check / unpublish`。构建方式见它的 README。
 - `scripts/setup.sh`：新电脑一次性配置。`scripts/dev/`：本地测试脚本。
 - `docs/`：架构、接口、写作指南、开发指南和变更记录。`docs/specs/`：设计存档。

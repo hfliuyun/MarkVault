@@ -11,6 +11,7 @@ import {
   type Diagnostic,
 } from "@markvault/content";
 import { CONFIG_PATH, readConfig, resolveVaultPath, type CliConfig } from "./config.ts";
+import { edgeOneConfigured, purgeHost } from "./edgeone.ts";
 import { commitVault } from "./git.ts";
 import { requireCredentials } from "./images/cloudinary.ts";
 import { syncImages, writeManifestPaths } from "./images/upload.ts";
@@ -129,8 +130,35 @@ async function runBuild(vault: string, config: CliConfig, deploy: boolean): Prom
   const { diagnostics } = await loadVault(vault, { ignore: config.ignore, requireUploaded: deploy });
   if (stopOnErrors(diagnostics)) return 1;
   await buildSite({ vault, requireUploaded: deploy });
-  if (deploy) await runInSite("wrangler", ["deploy", "--var", `CLOUDINARY_CLOUD:${cloudName(config)}`], { vault });
+  if (deploy) {
+    await runInSite("wrangler", ["deploy", "--var", `CLOUDINARY_CLOUD:${cloudName(config)}`], { vault });
+    await purgeCdn(config);
+  }
   return 0;
+}
+
+/**
+ * Purge the EdgeOne cache for site_url's host, if EdgeOne is configured.
+ * A failure only warns: the deploy itself has already succeeded, and the
+ * cache expires on its own.
+ */
+async function purgeCdn(config: CliConfig): Promise<void> {
+  if (!edgeOneConfigured(config.edgeone)) return;
+  if (!config.site_url) {
+    process.stderr.write("  ⚠ 配置了 edgeone 但没有 site_url，跳过清除 CDN 缓存\n");
+    return;
+  }
+  const hostname = new URL(config.site_url).hostname;
+  process.stdout.write(`\n▸ 清除 EdgeOne 缓存（${hostname}）\n`);
+  // Give the new Worker version a few seconds to reach every Cloudflare
+  // location, so EdgeOne does not refill its cache with the old pages.
+  await new Promise((resolve) => setTimeout(resolve, 10_000));
+  try {
+    const job = await purgeHost(config.edgeone, hostname);
+    process.stdout.write(`  已提交${job ? `（任务 ${job}）` : ""}，一般 1 分钟内生效\n`);
+  } catch (error) {
+    process.stderr.write(`  ⚠ 清除缓存失败：${(error as Error).message}。可以在 EdgeOne 后台手动清除，否则页面最多晚一个缓存周期更新。\n`);
+  }
 }
 
 async function runPublish(
@@ -170,6 +198,7 @@ async function runPublish(
 
   step("部署");
   await runInSite("wrangler", ["deploy", "--var", `CLOUDINARY_CLOUD:${cloudName(config)}`], { vault });
+  await purgeCdn(config);
 
   const previous = await readPublished(vault);
   const next = {

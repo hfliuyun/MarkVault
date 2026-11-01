@@ -2,6 +2,8 @@
 
 博客页面都是静态文件，没有文章接口。Worker 只处理图片和 Paste。实现在 `site/worker/`。
 
+站点前面可以放一层 CDN（例如 EdgeOne）：Worker 通过回源域名（`origin.<域名>`）提供服务，访客访问的是 `blog.<域名>`。Worker 用 `SITE_ORIGIN` 记住访客看到的地址，Paste 的 Origin 校验和图片防盗链都认它。
+
 ## 图片
 
 | 路径 | 说明 |
@@ -10,7 +12,7 @@
 | `GET /img/<hash>.<ext>` | svg、gif 等不转换的格式 |
 | `GET /img/raw/<hash>.<ext>` | 原图（压缩后），用于 `![[图片|raw]]` |
 
-- Referer 既不是本站、也不在 `IMG_REFERER_ALLOW`（逗号分隔的域名，含子域名）里时返回 403。没有 Referer 时放行。
+- Referer 的域名既不是当前 Host、也不是 `SITE_ORIGIN` 的域名、也不在 `IMG_REFERER_ALLOW`（逗号分隔的域名，含子域名）里时返回 403。没有 Referer 时放行。
 - 响应带 `Cache-Control: public, max-age=31536000, immutable`，并写入边缘缓存。上游失败的响应不缓存。
 - 不符合上面格式的路径返回 404。
 
@@ -22,7 +24,7 @@
 
 - **公开**：任何人都能调用。
 - **已信任**：需要有效的 `mv_device` cookie，否则返回 401。
-- 所有非 GET 请求的 `Origin` 必须是本站，否则返回 403。带请求体的接口要求 `Content-Type: application/json`，否则返回 415。
+- 所有非 GET 请求的 `Origin` 必须是 `SITE_ORIGIN` 或当前 Host，否则返回 403。带请求体的接口要求 `Content-Type: application/json`，否则返回 415。
 - 路径不存在返回 404，方法不对返回 405。
 - 请求体上限：普通接口 7MB，配对和改名接口 4KB。超过返回 413。
 

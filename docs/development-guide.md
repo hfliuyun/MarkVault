@@ -62,7 +62,22 @@ npm run markvault -- deploy     # 只改了代码时
 npm run markvault -- publish    # 内容有变化时（还会上传图片、提交 vault）
 ```
 
-两者都会用 `--var CLOUDINARY_CLOUD:<cloud_name>` 调用 `wrangler deploy`，`cloud_name` 来自本机配置。正式域名在 `site/wrangler.jsonc` 的 `routes` 里，`workers.dev` 地址已关闭。
+两者都会用 `--var CLOUDINARY_CLOUD:<cloud_name>` 调用 `wrangler deploy`，`cloud_name` 来自本机配置。域名写在 `site/wrangler.jsonc` 的 `routes` 里：`blog.<域名>` 是访客地址，`origin.<域名>` 是 CDN 的回源地址。`vars.SITE_ORIGIN` 要和访客地址一致，否则 Paste 的写操作和图片防盗链会误判。`workers.dev` 地址已关闭。
+
+如果站点前面有 EdgeOne，在 `~/.config/markvault/config.json` 里加一段 `edgeone`，`deploy` 和 `publish` 成功后会自动清除它的缓存：
+
+```json
+{
+  "edgeone": {
+    "zone_id": "zone-xxxxxxxx",
+    "secret_id": "……",
+    "secret_key": "……",
+    "endpoint": "teo.intl.tencentcloudapi.com"
+  }
+}
+```
+
+`endpoint` 只在国际站以外需要改。密钥建议用只有 EdgeOne 清除缓存权限的子账号。没配这一段时清除缓存这步直接跳过；清除失败只打印警告，不影响部署结果。
 
 ## Obsidian 插件
 

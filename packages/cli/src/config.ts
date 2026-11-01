@@ -1,13 +1,16 @@
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { EdgeOneConfig } from "./edgeone.ts";
 
 export interface CliConfig {
   vault?: string;
   ignore?: string[];
-  /** Public site address, only used to print links after publishing. */
+  /** Public site address: links printed after publishing, paste-invite links, the host whose CDN cache is purged. */
   site_url?: string;
   cloudinary?: { cloud_name?: string; api_key?: string; api_secret?: string };
+  /** Optional: purge the EdgeOne cache in front of the site after each deploy. */
+  edgeone?: EdgeOneConfig;
 }
 
 export const CONFIG_PATH = path.join(

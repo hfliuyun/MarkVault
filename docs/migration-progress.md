@@ -206,3 +206,17 @@ MarkVault 从 Flask + Vue + VPS 迁移到 Cloudflare Workers 的过程记录。�
   - 仓库是公开的，所以本文件删掉了服务器地址、SSH 信息、zone id、token 前缀、设备名和本机路径，"本地测试"移到开发指南。这些信息在更早的提交历史里仍然能看到。
 - 验证：类型检查（packages、site、worker）、`markvault check`、`markvault build` 通过。
 - 需要用户在后台处理：删除旧 API 子域名的 DNS 记录和 tunnel 里对应的 hostname、删除 GitHub 仓库里旧部署用的 `VPS_*` secrets、作废旧的 Notion token。
+
+### 2026-11-01（Claude Code，EdgeOne 加速）
+
+- 背景：国内直连 Cloudflare 太慢。用 EdgeOne 国际版在前面加一层 CDN。没有 ICP 备案，只能选"全球（不含中国大陆）"，国内访客走境外节点。
+- 先用测试域名 `edge.<域名>` 验证：回源 Host 一开始用默认值，Cloudflare 又把请求送回 EdgeOne，返回 423 和 `cdn-loop: TencentEdgeOne; loops=16`。改成自定义回源 Host 后正常。缓存规则：页面 10 分钟、`/_astro` 和 `/img` 30 天、`/api` 和 `/paste` 不缓存。
+- 测速：本机走代理测文章页，直连 Cloudflare 5 次里 3 次超时或超过 17 秒，EdgeOne 5 次都在 1–2.6 秒；用户在 itdog 上看到国内节点整体更绿，手机 4G 打开也明显更快。
+- 测试期间为了能加载图片，把 `IMG_REFERER_ALLOW` 设成 `liuyun.ac.cn`（提交 `871b8f4`）。其他子域名的页面能引用 `/img/*`，外站和仿冒域名仍然 403。
+- 切换准备：
+  - Worker 加 `SITE_ORIGIN`（`site/worker/http.ts` 的 `assertSameOrigin` 和 `img.ts` 的 Referer 校验）：比对本机 Host 之外也认访客地址，经过 CDN 时 Paste 的写操作和图片不会被误判成跨站。
+  - `wrangler.jsonc` 的 `routes` 加上回源域名 `origin.<域名>`，`vars.SITE_ORIGIN` 设成访客地址，重新部署（版本 `d4d0a10e`）。
+  - 新增 `packages/cli/src/edgeone.ts`：腾讯云 TC3-HMAC-SHA256 签名，调用 `CreatePurgeTask`（`purge_host`）。签名用官方文档的示例核对过，结果一致。`deploy` 和 `publish` 部署后等 10 秒再清缓存，避免 CDN 把旧页面回填进去。
+  - `setup.sh` 加了可选的 EdgeOne 配置步骤（zone_id、SecretId、SecretKey）。
+- 验证：`origin.<域名>` 和 `blog.<域名>` 的首页、文章页、`session` 都是 200；图片 Referer 是本域名时 200、外站 403；配对接口 `Origin` 是访客地址时 400（配对码错误，说明已经进了业务层）、外站 403。`blog` 行为不变。
+- 待做：在 EdgeOne 添加 `blog.<域名>` 加速域名、切换 DNS、配置子账号密钥。
